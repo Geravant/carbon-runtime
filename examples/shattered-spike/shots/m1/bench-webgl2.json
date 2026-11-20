@@ -1,0 +1,101 @@
+{
+ "gpu": "metal",
+ "results": [
+  {
+   "ships": 1,
+   "backend": "webgl2",
+   "adapter": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "firstFrameMs": 76,
+   "error": null,
+   "canvasRead": {
+    "width": 1280,
+    "height": 720,
+    "distinctColours": 10756,
+    "meanLuma": 205.21,
+    "darkShare": 0.1442,
+    "corner": [
+     220,
+     215,
+     206,
+     255
+    ],
+    "centre": [
+     202,
+     154,
+     131,
+     255
+    ]
+   },
+   "bench": {
+    "adapter": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+    "ships": 1,
+    "frames": 312,
+    "width": 1280,
+    "height": 720,
+    "interval": {
+     "mean": 16.666346153846167,
+     "median": 16.699999999999818,
+     "p95": 16.700000000000728
+    },
+    "cpu": {
+     "mean": 0.5923076898623736,
+     "median": 0.5999999046325684,
+     "p95": 0.8999999761581421
+    },
+    "submitToDone": {
+     "mean": 0.6136666663487752,
+     "median": 0.6000000238418579,
+     "p95": 1
+    }
+   }
+  },
+  {
+   "ships": 30,
+   "backend": "webgl2",
+   "adapter": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "firstFrameMs": 77.39999997615814,
+   "error": null,
+   "canvasRead": {
+    "width": 1280,
+    "height": 720,
+    "distinctColours": 8652,
+    "meanLuma": 210.57,
+    "darkShare": 0.1057,
+    "corner": [
+     220,
+     215,
+     206,
+     255
+    ],
+    "centre": [
+     39,
+     37,
+     52,
+     255
+    ]
+   },
+   "bench": {
+    "adapter": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+    "ships": 30,
+    "frames": 312,
+    "width": 1280,
+    "height": 720,
+    "interval": {
+     "mean": 16.66602564102565,
+     "median": 16.699999999999818,
+     "p95": 16.799999999999727
+    },
+    "cpu": {
+     "mean": 1.1413461573612995,
+     "median": 1,
+     "p95": 1.899999976158142
+    },
+    "submitToDone": {
+     "mean": 1.1586666707197826,
+     "median": 1.0999999046325684,
+     "p95": 1.899999976158142
+    }
+   }
+  }
+ ]
+}

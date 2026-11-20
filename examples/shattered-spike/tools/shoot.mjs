@@ -6,7 +6,7 @@
 // Serves examples/shattered-spike/ from a free local port for the run and stops the server at
 // the end. Audio is muted. Screenshots go to ../shots/ (or ../shots/<--out>/).
 //
-// --backend webgl2 runs Chrome with WebGPU disabled and asks the page for the WebGL2 backend.
+// --backend webgl2 runs Chrome with WebGPU disabled (no adapter), so the page falls back to WebGL2.
 // --gpu swiftshader runs on the software rasteriser, as a machine with no GPU does: WebGPU through
 //   Dawn's SwiftShader adapter, WebGL2 through ANGLE on SwiftShader.
 // --executable names a Chromium binary instead of the installed Chrome (the test server's).
@@ -51,9 +51,9 @@ const base = `http://127.0.0.1:${server.address().port}/`;
 
 const gpuArgs = {
   "webgpu/metal": [ "--enable-unsafe-webgpu", "--enable-features=Vulkan", "--use-angle=metal", "--ignore-gpu-blocklist" ],
-  "webgl2/metal": [ "--disable-features=WebGPU", "--disable-blink-features=WebGPU", "--use-angle=metal", "--ignore-gpu-blocklist" ],
+  "webgl2/metal": [ "--disable-features=WebGPUService", "--use-angle=metal", "--ignore-gpu-blocklist" ],
   "webgpu/swiftshader": [ "--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-features=Vulkan", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--disable-gpu-sandbox" ],
-  "webgl2/swiftshader": [ "--disable-features=WebGPU", "--disable-blink-features=WebGPU", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist" ]
+  "webgl2/swiftshader": [ "--disable-features=WebGPUService", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist" ]
 }[`${BACKEND}/${GPU}`];
 if (!gpuArgs) throw new Error(`no flag set for --backend ${BACKEND} --gpu ${GPU}`);
 const extraArgs = option("--chrome-args", "").split(" ").filter(Boolean);
@@ -73,10 +73,14 @@ async function open(query)
   page.on("console", message => log.push(`[${message.type()}] ${message.text()}`));
   page.on("pageerror", error => log.push(`[pageerror] ${error.stack ?? error}`));
   const started = Date.now();
-  await page.goto(`${base}index.html?${BACKEND === "webgl2" ? "backend=webgl2&" : ""}${query}`);
+  // On WebGL2 runs the page keeps its default preference (WebGPU, then WebGL2): the browser has no
+  // WebGPU adapter, so reaching WebGL2 is the engine's own fallback. --force-backend asks for it by name.
+  await page.goto(`${base}index.html?${flag("--force-backend") ? `backend=${BACKEND}&` : ""}${query}`);
   await page.waitForFunction(() => window.__spike && (window.__spike.error || (window.__spike.ready && window.__spike.frames > 5)), null, { timeout: Number(option("--wait", 20000)) }).catch(() => {});
-  const state = await page.evaluate(() => ({ ready: window.__spike?.ready, error: window.__spike?.error, frames: window.__spike?.frames, firstFrameMs: window.__spike?.firstFrameMs, backend: window.__spike?.backendName, adapter: window.__spike?.adapter, hasWebGPU: !!navigator.gpu, diagnostics: (window.__spike?.diagnostics ?? []).slice(0, 6), jobStatus: window.__spike?.status?.() }));
+  const state = await page.evaluate(() => ({ ready: window.__spike?.ready, error: window.__spike?.error, frames: window.__spike?.frames, firstFrameMs: window.__spike?.firstFrameMs, backend: window.__spike?.backendName, adapter: window.__spike?.adapter, diagnostics: (window.__spike?.diagnostics ?? []).slice(0, 6), jobStatus: window.__spike?.status?.() }));
   state.wallMs = Date.now() - started;
+  state.webgpuAdapter = await page.evaluate(async () => !!(navigator.gpu && await navigator.gpu.requestAdapter().catch(() => null)));
+  if (state.backend !== BACKEND) failed = true;
   // What a canvas read gives back, taken inside a frame: a blank or single-colour canvas is not a picture.
   if (state.ready && !state.error) state.canvasRead = await page.evaluate(() => window.__spike.readCanvas());
   if (!state.ready || state.error || state.diagnostics.length || !(state.canvasRead?.distinctColours > 50)) failed = true;
@@ -97,7 +101,7 @@ try
       await page.waitForFunction(() => window.__spike.bench || window.__spike.error, null, { timeout: 120000 }).catch(() => {});
       const bench = await page.evaluate(() => window.__spike.bench);
       results.push({ ships: Number(count), backend: state.backend, adapter: state.adapter, firstFrameMs: state.firstFrameMs, error: state.error, canvasRead: state.canvasRead, bench });
-      await page.screenshot({ path: join(shots, `bench-${count}-ships.png`) });
+      await page.screenshot({ path: join(shots, `${BACKEND}-bench-${count}-ships.png`) });
       await page.close();
     }
     console.log(JSON.stringify({ results }, null, 1));
