@@ -41,7 +41,7 @@ const base = `http://127.0.0.1:${server.address().port}/`;
 const browser = await chromium.launch({
   channel: "chrome",
   headless: true,
-  args: [ "--mute-audio", "--enable-unsafe-webgpu", "--enable-features=Vulkan", "--use-angle=metal", "--ignore-gpu-blocklist", "--disable-gpu-vsync".replace("--disable-gpu-vsync", flag("--novsync") ? "--disable-gpu-vsync" : "--mute-audio"), ...(flag("--novsync") ? [ "--disable-frame-rate-limit" ] : []) ]
+  args: [ "--mute-audio", "--enable-unsafe-webgpu", "--enable-features=Vulkan", "--use-angle=metal", "--ignore-gpu-blocklist", ...(flag("--novsync") ? [ "--disable-gpu-vsync", "--disable-frame-rate-limit" ] : []) ]
 });
 const width = Number(option("--width", 1280)), height = Number(option("--height", 720));
 const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: Number(option("--ratio", 1)) });
@@ -54,8 +54,8 @@ async function open(query)
   page.on("pageerror", error => log.push(`[pageerror] ${error.stack ?? error}`));
   const started = Date.now();
   await page.goto(`${base}index.html?${query}`);
-  await page.waitForFunction(() => window.__spike && (window.__spike.error || (window.__spike.ready && window.__spike.frames > 5)), null, { timeout: 60000 }).catch(() => {});
-  const state = await page.evaluate(() => ({ ready: window.__spike?.ready, error: window.__spike?.error, frames: window.__spike?.frames, firstFrameMs: window.__spike?.firstFrameMs, backend: window.__spike?.backend, diagnostics: (window.__spike?.diagnostics ?? []).slice(0, 5).map(d => `${d.type}: ${d.error?.stack ?? d.error ?? ""}`) }));
+  await page.waitForFunction(() => window.__spike && (window.__spike.error || (window.__spike.ready && window.__spike.frames > 5)), null, { timeout: Number(option("--wait", 20000)) }).catch(() => {});
+  const state = await page.evaluate(() => ({ ready: window.__spike?.ready, error: window.__spike?.error, frames: window.__spike?.frames, firstFrameMs: window.__spike?.firstFrameMs, backend: window.__spike?.backendName, diagnostics: (window.__spike?.diagnostics ?? []).slice(0, 6), jobStatus: window.__spike?.status?.() }));
   state.wallMs = Date.now() - started;
   return { page, state };
 }
@@ -84,6 +84,7 @@ try
     const angles = flag("--probe") ? [ 30 ] : option("--angles", "0,45,90,135,180,225,270,315").split(",").map(Number);
     const { page, state } = await open(`ships=${ships}&yaw=${angles[0]}&${extra}`);
     console.log(JSON.stringify(state, null, 1));
+    if (flag("--debug")) console.log(JSON.stringify(await page.evaluate(() => window.__spike.debug?.())));
     if (state.ready && !state.error)
     {
       for (const angle of angles)
@@ -101,6 +102,10 @@ try
 finally
 {
   if (log.length) console.log(log.slice(0, Number(option("--log", 40))).join("\n"));
+  // The miss log: every path the page asked this server for, and whether a file of ours answered.
+  await writeFile(join(root, "shots", "requests.json"), `${JSON.stringify(requests.filter(r => !r.path.startsWith("shots")), null, 1)}\n`);
+  const missing = requests.filter(r => r.missing);
+  console.log(`requests: ${requests.length}, unanswered: ${missing.length}${missing.length ? ` (${[ ...new Set(missing.map(r => r.path)) ].join(", ")})` : ""}`);
   await browser.close();
   await new Promise(resolve => server.close(resolve));
 }

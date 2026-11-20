@@ -16,7 +16,7 @@ import { blue } from "../../../npm/dist/blue/index.js";
 import { BlueScriptCallback } from "../../../npm/dist/blue/index.js";
 import { mat4 } from "../../../npm/dist/global/math/mat4.js";
 import { vec3 } from "../../../npm/dist/global/math/vec3.js";
-import { PixelFormat } from "../../../npm/dist/global/consts/renderContext/formats.js";
+import { DepthStencilFormat, PixelFormat } from "../../../npm/dist/global/consts/renderContext/formats.js";
 import { ShaderType } from "../../../npm/dist/global/consts/renderContext/pipeline.js";
 import { TR2SHADERMODEL, TriBatchType } from "../../../npm/dist/global/consts/graphics/trinityEnums.js";
 import { trinity } from "../../../npm/dist/trinity/CjsTrinity.js";
@@ -53,6 +53,10 @@ const ELEVATION = Number(params.get("elevation") ?? 12) * Math.PI / 180;
 const PAINT = params.get("paint") !== "0";
 const BENCH = Number(params.get("bench") ?? 0) | 0;
 const HULL = params.get("hull") ?? "cruiser";
+// camera=ortho (default, the game's own projection), perspective (an orbit in perspective) or flyby.
+const CAMERA = params.get("camera") ?? "ortho";
+// hold=1: time only moves through window.__spike.setTime, for frame sequences.
+const HOLD = params.get("hold") === "1";
 
 const spike = window.__spike = { ready: false, error: null, frames: 0, firstFrameMs: null, bench: null, diagnostics: [] };
 
@@ -210,7 +214,11 @@ async function Main()
   canvas.height = Math.max(1, Math.round(canvas.clientHeight * ratio));
 
   // Our own effect tree is already WebGPU: source and target are the same, so no translator.
-  const library = new CjsLibrary({ effects: { source: "webgpu", target: "webgpu", translator: null, shaderModel: "depth" } });
+  // No callback workers: the page ships one script (the default worker entry is a separate module).
+  const library = new CjsLibrary({
+    effects: { source: "webgpu", target: "webgpu", translator: null, shaderModel: "depth" },
+    callbackMan: { useWorkers: false }
+  });
   const backend = await library.AcquireBackend({ canvas, preference: [ "webgpu" ], shaderModel: "depth" });
   library.SetConfiguration({ paths: { shattered: new CjsBlueResFileSystemFetch({ paths: { res: new URL("./res/", location.href).href } }) } });
   await library.Initialize({});
@@ -218,9 +226,14 @@ async function Main()
   Tr2Renderer.SetShaderModel(TR2SHADERMODEL.TR2SM_3_0_DEPTH);
   device.width = canvas.width;
   device.height = canvas.height;
-  spike.backend = backend.name;
+  spike.backendName = backend.name;
 
   const renderContext = Tr2RenderContext_GetMainThreadRenderContext();
+
+  // Blue is host-pumped: resources only finish loading while something calls PumpOS.
+  let loading = true;
+  const pump = () => { if (!loading) return; blue.os.PumpOS(); requestAnimationFrame(pump); };
+  requestAnimationFrame(pump);
 
   const [ { geometry, meta }, hullEffect, normalEffect, paintEffect ] = await Promise.all([
     LoadHullGeometry(HULL), LoadEffect("hull"), LoadEffect("hullnormal"), LoadEffect("watercolour")
@@ -245,7 +258,8 @@ async function Main()
   {
     const ship = new ShatteredShip();
     const column = i % columns, row = Math.floor(i / columns);
-    vec3.set(ship.home, (column - (columns - 1) / 2) * spacingX, 0, (row - (rows - 1) / 2) * spacingZ);
+    const inRow = Math.min(columns, SHIPS - row * columns);
+    vec3.set(ship.home, (column - (inRow - 1) / 2) * spacingX, 0, (row - (rows - 1) / 2) * spacingZ);
     ship.phase = SHIPS === 1 ? 0 : i * 0.9;
     fleet.ships.push(ship);
   }
@@ -260,8 +274,8 @@ async function Main()
   {
     colourTarget.Create(canvas.width, canvas.height, 1, PixelFormat.PIXEL_FORMAT_R16G16B16A16_FLOAT);
     normalTarget.Create(canvas.width, canvas.height, 1, PixelFormat.PIXEL_FORMAT_R16G16B16A16_FLOAT);
-    depth.Create(canvas.width, canvas.height, PixelFormat.PIXEL_FORMAT_D32_FLOAT, 1, 0, 0, renderContext);
-    if (!colourTarget.IsValid() || !normalTarget.IsValid() || !depth.IsValid()) throw new Error("the scene targets could not be created");
+    depth.Create(canvas.width, canvas.height, DepthStencilFormat.DSFMT_D32F, 1, 0, 0, renderContext);
+    if (!colourTarget.IsValid() || !normalTarget.IsValid() || !depth.IsValid()) throw new Error(`the scene targets could not be created (colour ${colourTarget.IsValid()}, normal ${normalTarget.IsValid()}, depth ${depth.IsValid()})`);
   };
   CreateTargets();
 
@@ -314,12 +328,24 @@ async function Main()
     callback(() =>
     {
       const aspect = canvas.width / canvas.height;
-      const height = Math.max(extent * 2, extent * 2 / aspect);
+      const height = SHIPS === 1 ? extent * 2 / aspect : Math.max(extent * 2, extent * 2 / aspect);
       const distance = extent * 4;
-      vec3.set(eye, Math.sin(state.yaw) * Math.cos(ELEVATION), Math.sin(ELEVATION), Math.cos(state.yaw) * Math.cos(ELEVATION));
-      vec3.scale(eye, eye, distance);
-      view.SetLookAtPosition(eye, [ 0, 0, 0 ], [ 0, 1, 0 ]);
-      projection.PerspectiveOrthographic(height * aspect, height, 0.1, distance * 2);
+      if (CAMERA === "flyby")
+      {
+        // A fly-past in perspective: the camera travels a straight line beside the ship, looking at it.
+        const along = (state.time % 8) / 8 * 2 - 1;
+        vec3.set(eye, along * extent * 3.2, extent * 0.45, extent * 1.5);
+        view.SetLookAtPosition(eye, [ 0, 0, 0 ], [ 0, 1, 0 ]);
+        projection.PerspectiveFov(0.7, aspect, 0.1, extent * 12);
+      }
+      else
+      {
+        vec3.set(eye, Math.sin(state.yaw) * Math.cos(ELEVATION), Math.sin(ELEVATION), Math.cos(state.yaw) * Math.cos(ELEVATION));
+        vec3.scale(eye, eye, distance);
+        view.SetLookAtPosition(eye, [ 0, 0, 0 ], [ 0, 1, 0 ]);
+        if (CAMERA === "perspective") projection.PerspectiveFov(0.55, aspect, 0.1, distance * 3);
+        else projection.PerspectiveOrthographic(height * aspect, height, 0.1, distance * 2);
+      }
       for (const ship of fleet.ships) ship.Update(state.time);
     }),
     // Pass 1: the body wash into the colour target.
@@ -373,6 +399,7 @@ async function Main()
   jobs.recurring.push(job);
   device.SetRenderJobs(jobs);
 
+  loading = false;
   // The frame loop: Blue's tick runs Trinity, which runs the device's render jobs.
   const frameTimes = [];
   let last = performance.now();
@@ -381,8 +408,11 @@ async function Main()
     requestAnimationFrame(tick);
     const dt = (now - last) / 1000;
     last = now;
-    state.time += dt;
-    if (HELD_YAW === null) state.yaw += dt * 0.5;
+    if (!HOLD)
+    {
+      state.time += dt;
+      if (HELD_YAW === null) state.yaw += dt * 0.5;
+    }
     const before = performance.now();
     blue.os.PumpOS();
     const cpu = performance.now() - before;
@@ -402,14 +432,21 @@ async function Main()
         spike.bench = { ships: SHIPS, frames: frameTimes.length, width: canvas.width, height: canvas.height, interval: summary("interval"), cpu: summary("cpu") };
       }
     }
-    spike.diagnostics = renderContext.GetDiagnostics?.() ?? [];
+    const diagnostics = renderContext.GetDiagnostics();
+    if (diagnostics.length)
+    {
+      for (const d of diagnostics) if (spike.diagnostics.length < 20) spike.diagnostics.push(`${d.type}: ${d.error?.stack ?? d.error ?? d.message ?? ""} ${d.step?.constructor?.name ?? ""}`);
+      renderContext.ClearDiagnostics();
+    }
   };
   requestAnimationFrame(tick);
 
   Object.assign(spike, {
     ready: true, state, canvas, job, renderContext, backend, meta,
     setYaw(degrees) { state.yaw = degrees * Math.PI / 180; },
-    status: () => job.status
+    setTime(seconds) { state.time = seconds; if (HELD_YAW === null) state.yaw = seconds * 0.5; },
+    status: () => job.status,
+    debug: () => ({ projection: Array.from(Tr2Renderer.GetProjectionTransform()), view: Array.from(Tr2Renderer.GetViewTransform()), viewport: esm().GetViewport(), device: esm().GetDeviceViewport(), canvas: [ canvas.width, canvas.height ] })
   });
 }
 

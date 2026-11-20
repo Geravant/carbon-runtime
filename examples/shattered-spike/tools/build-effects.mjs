@@ -18,7 +18,10 @@ import { CjsFxEffectCompilerWebGPU } from "../../../src/resource/shader/compiler
 
 const here = dirname(fileURLToPath(import.meta.url));
 const source = join(here, "..", "effects");
-const out = join(here, "..", "res", "graphics", "effect.webgpu", "shattered");
+const tree = join(here, "..", "res", "graphics", "effect.webgpu");
+// Where each source folder lands in the effect tree. `system/` holds our own files for the
+// built-in paths the engine itself asks for (Tr2Blitter's blit effects).
+const FOLDERS = [ [ "", "shattered" ], [ "system", "managed/space/system" ] ];
 const SHADER_MODELS = [ "sm_hi", "sm_lo", "sm_depth" ];
 
 const read = path =>
@@ -27,12 +30,15 @@ const read = path =>
   return existsSync(file) ? readFileSync(file, "utf8") : null;
 };
 
-rmSync(out, { recursive: true, force: true });
-mkdirSync(out, { recursive: true });
+rmSync(tree, { recursive: true, force: true });
 
 let failed = false;
-for (const name of readdirSync(source).filter(file => file.endsWith(".fx")).sort())
+for (const [ folder, target ] of FOLDERS)
+for (const file of readdirSync(join(source, folder)).filter(entry => entry.endsWith(".fx")).sort())
 {
+  const name = folder ? `${folder}/${file}` : file;
+  const out = join(tree, target);
+  mkdirSync(out, { recursive: true });
   const compilers = new Map([ [ Platform.PLATFORM_WEBGPU, session => new CjsFxEffectCompilerWebGPU(session) ] ]);
   let compiled;
   try
@@ -50,8 +56,8 @@ for (const name of readdirSync(source).filter(file => file.endsWith(".fx")).sort
     continue;
   }
   if (compiled.messages.length) console.log(compiled.messages.join("\n"));
-  const base = name.replace(/\.fx$/u, "");
+  const base = file.replace(/\.fx$/u, "");
   for (const model of SHADER_MODELS) writeFileSync(join(out, `${base}.${model}`), compiled.bytes);
-  console.log(`res:/graphics/effect.webgpu/shattered/${base}.sm_* (${compiled.bytes.length} bytes)`);
+  console.log(`res:/graphics/effect.webgpu/${target}/${base}.sm_* (${compiled.bytes.length} bytes)`);
 }
 if (failed) process.exit(1);

@@ -1,0 +1,43 @@
+[
+ {
+  "path": "index.html",
+  "bytes": 627
+ },
+ {
+  "path": "dist/spike.js",
+  "bytes": 16120645
+ },
+ {
+  "path": "favicon.ico",
+  "bytes": 0,
+  "missing": true
+ },
+ {
+  "path": "data/cruiser.json",
+  "bytes": 8768
+ },
+ {
+  "path": "data/cruiser.bin",
+  "bytes": 823440
+ },
+ {
+  "path": "res/graphics/effect.webgpu/managed/space/system/blit.sm_depth",
+  "bytes": 2842
+ },
+ {
+  "path": "res/graphics/effect.webgpu/managed/space/system/blitfiltered.sm_depth",
+  "bytes": 2592
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/hull.sm_depth",
+  "bytes": 7845
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/hullnormal.sm_depth",
+  "bytes": 4559
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/watercolour.sm_depth",
+  "bytes": 8060
+ }
+]
