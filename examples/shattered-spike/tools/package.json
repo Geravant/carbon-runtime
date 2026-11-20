@@ -1,0 +1,9 @@
+{
+  "name": "shattered-spike-tools",
+  "private": true,
+  "type": "module",
+  "description": "Build-time tools of the Shattered Reach rendering spike. three is used only to run the game's own hull builder.",
+  "dependencies": {
+    "three": "^0.170.0"
+  }
+}
