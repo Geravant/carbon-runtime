@@ -50,6 +50,35 @@ const { backend, device, renderContext, effectTarget } = await ShatteredBoot({
 
 Blue is pumped by the host: resources finish loading, and render jobs run, only inside `blue.os.PumpOS()`. Call it every animation frame, from before the first `await blue.resMan.Ready(...)`.
 
+### Drawing and pumping: three calls
+
+```js
+import { blue, DrawNow, PumpLoading, GetCanvasTarget } from "@geravant/carbon-runtime-slim";
+```
+
+| Call | Loading pumped | Render jobs | Use |
+|---|---|---|---|
+| `blue.os.PumpOS()` | yes | every job installed on the device, **exactly once per call** | the plain one-view loop |
+| `DrawNow(job)` | no | **that job, exactly once**, before the call returns; the job need not be registered | several views a frame: one call per view |
+| `DrawNow()` | no | every installed job, exactly once | |
+| `PumpLoading()` | yes | none | once per animation frame beside `DrawNow`; and while awaiting a load when the installed jobs must not run |
+
+- The once-per-call promise: `PumpOS` calls each Blue ticker once, the device's tick calls `Render` once, `Render` runs `Tr2RenderJobs.Run` once, and no step of that is gated on time or frame rate. `DrawNow` calls `device.Render()` directly. Any of them may be called many times in one task. The spike page checks it on both backends: `?views=6` draws six views a frame with six `DrawNow(job)` calls (`&draw=pump`: six `PumpOS()` calls) and counts six job runs every frame (`shots/m3/views/`).
+- Each `DrawNow` or `PumpOS` is a complete device frame. Several in one task accumulate on the canvas: a later call does not clear what an earlier one drew, unless a `TriStepClear` runs with the canvas bound.
+- A job with `job.enabled = false` is skipped by all of them. That is the per-job switch.
+- `PumpLoading()` leaves the canvas showing its last picture (checked: `?lateload=1` loads a PNG through `resMan` under `PumpLoading()` only; the registered job ran 0 times and the page still showed the ship).
+- With `DrawNow` the engine's animation clock (`device.animationTime`) only moves in `PumpLoading()`/`PumpOS()`; pass your own time to your shaders.
+
+**The canvas as a target, on both backends:** `backend.GetCanvasTarget()` (or `GetCanvasTarget(backend)`).
+
+```js
+backend.al.SetRenderTarget(0, backend.GetCanvasTarget());
+backend.al.SetDepthStencil(null);
+renderContext.GetEffectStateManager().SetViewport({ x, y, width, height });   // canvas pixels, origin top left
+```
+
+A viewport set this way on the canvas is honoured to the pixel on WebGPU and WebGL2: in the six-view test no pixel of a view lies outside its rectangle and no gutter pixel inside one, with the same edge pixels on both backends. `TriStepClear` clears the whole bound target, not the viewport: clear before setting a view's rectangle. In a full-screen effect `SV_Position` is in target pixels, so subtract the viewport origin when a view's offscreen targets start at (0, 0) (`ViewRect` in the spike's `watercolour.fx`).
+
 ### Fork additions the game should use
 
 | Call | Replaces |
@@ -60,7 +89,9 @@ Blue is pumped by the host: resources finish loading, and render jobs run, only 
 | `AcquireBackend({ ..., translator: false })` (done by `ShatteredBoot`) | passing an `effects` section by hand |
 | `Tr2DepthStencil.Create` now throws a `RangeError` for a format no backend can create | an invalid surface with no message |
 
-On WebGL2 the canvas is `backend.al.GetDefaultBackBuffer()`; on WebGPU it is `backend.renderTarget`.
+| `backend.GetCanvasTarget()` | `backend.name === "webgpu" ? backend.renderTarget : backend.al.GetDefaultBackBuffer()` |
+| `DrawNow(job)`, `PumpLoading()` | calling `PumpOS()` per view with guards in every job callback |
+| `LoadTexture`, `CreateTextureFromImage`, `UpdateTextureFromImage` | nothing: textures were not loadable before |
 
 ### Textures (our own images)
 

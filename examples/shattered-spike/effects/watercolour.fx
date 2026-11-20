@@ -49,6 +49,13 @@ float4 BackdropMix
     string SasUiDescription = "( 1 = the paper is transparent away from hulls, so a picture drawn first shows; unused x3 )";
 > = float4( 0.0, 0.0, 0.0, 0.0 );
 
+float4 ViewRect
+<
+    bool SasUiVisible = true;
+    string Group = "Watercolour";
+    string SasUiDescription = "( x, y, width, height ) of the canvas viewport being drawn, in pixels; width 0 = the whole target. The scene targets hold the view in their top-left width x height.";
+> = float4( 0.0, 0.0, 0.0, 0.0 );
+
 struct WatercolourVSInput
 {
     float4 position : POSITION;
@@ -138,8 +145,14 @@ float4 WatercolourPS( float4 position : SV_Position ) : SV_Target
     uint height;
     SceneColour.GetDimensions( width, height );
     int2 size = int2( width, height );
-    int2 pixel = int2( position.xy );
-    float2 uv = position.xy / float2( size );
+    float2 fragment = position.xy;
+    if( ViewRect.z > 0.0 )
+    {
+        size = int2( ViewRect.zw );
+        fragment -= ViewRect.xy;
+    }
+    int2 pixel = int2( fragment );
+    float2 uv = fragment / float2( size );
     float2 p = float2( uv.x * float( width ) / float( height ), uv.y );
 
     // The paper.
@@ -162,7 +175,7 @@ float4 WatercolourPS( float4 position : SV_Position ) : SV_Target
     col = wash( col, float3( 0.62, 0.64, 0.74 ), InkSettings.z * rim * 0.30 );
 
     // The ink.
-    float w = InkSettings.x * ( 0.8 + 0.5 * noise2( position.xy * 0.08 ) );
+    float w = InkSettings.x * ( 0.8 + 0.5 * noise2( fragment * 0.08 ) );
     float e = 0.0;
     e = max( e, EdgeAt( pixel, float2( w, 0.0 ), size, c, n ) );
     e = max( e, EdgeAt( pixel, float2( -w, 0.0 ), size, c, n ) );

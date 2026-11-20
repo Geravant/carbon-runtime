@@ -93,7 +93,10 @@ async function open(query)
   state.webgpuAdapter = await page.evaluate(async () => !!(navigator.gpu && await navigator.gpu.requestAdapter().catch(() => null)));
   if (state.backend !== BACKEND) failed = true;
   // What a canvas read gives back, taken inside a frame: a blank or single-colour canvas is not a picture.
-  if (state.ready && !state.error) state.canvasRead = await page.evaluate(() => window.__spike.readCanvas());
+  if (state.ready && !state.error && !query.includes("lateload=1")) state.canvasRead = await page.evaluate(() => window.__spike.readCanvas());
+  if (query.includes("lateload=1")) return { page, state };
+  state.views = await page.evaluate(() => window.__spike?.views ?? null) ?? undefined;
+  if (state.views && !(state.views.check?.gutterInside === 0 && state.views.check?.pictureOutside === 0 && state.views.runsPerFrame.every(runs => runs === state.views.count))) failed = true;
   if (!state.ready || state.error || state.diagnostics.length || !(state.canvasRead?.distinctColours > 50)) failed = true;
   return { page, state };
 }
@@ -117,6 +120,28 @@ try
     }
     console.log(JSON.stringify({ results }, null, 1));
     await writeFile(join(shots, `bench-${BACKEND}.json`), `${JSON.stringify({ gpu: GPU, results }, null, 1)}\n`);
+  }
+  else if (flag("--lateload"))
+  {
+    // Request 2: a resource loads while only PumpLoading() runs. The registered job must not run meanwhile,
+    // and the canvas must still show its last picture afterwards (a screenshot, since nothing draws any more).
+    const { page, state } = await open(`ships=${ships}&yaw=30&lateload=1&${extra}`);
+    await page.waitForFunction(() => window.__spike.error || window.__spike.lateLoad?.loaded !== undefined, null, { timeout: 15000 }).catch(() => {});
+    for (let i = 0; i < 30; i++) await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+    const shot = await page.screenshot({ path: join(shots, `${BACKEND}-lateload.png`) });
+    const picture = await page.evaluate(async data =>
+    {
+      const image = await createImageBitmap(await (await fetch(`data:image/png;base64,${data}`)).blob());
+      const context = new OffscreenCanvas(image.width, image.height).getContext("2d");
+      context.drawImage(image, 0, 0);
+      const pixels = context.getImageData(0, 0, image.width, image.height).data, colours = new Set();
+      for (let i = 0; i < pixels.length; i += 28) colours.add((pixels[i] << 16) | (pixels[i + 1] << 8) | pixels[i + 2]);
+      return { distinctColours: colours.size };
+    }, shot.toString("base64"));
+    const lateLoad = await page.evaluate(() => ({ ...window.__spike.lateLoad, error: window.__spike.error }));
+    console.log(JSON.stringify({ backend: state.backend, lateLoad, screenshotAfter: picture }));
+    if (!(lateLoad.loaded === true && lateLoad.jobRunsDuringLoad === 0 && picture.distinctColours > 50)) failed = true;
+    await page.close();
   }
   else if (flag("--sequence"))
   {

@@ -7,6 +7,7 @@ import { TR2SHADERMODEL } from "../../src/global/consts/graphics/trinityEnums.js
 import { Tr2Blitter } from "../../src/trinity/core/Tr2Blitter.js";
 import { Tr2Renderer } from "../../src/trinity/core/Tr2Renderer.js";
 import { Tr2RenderContext_GetMainThreadRenderContext } from "../../src/trinity/core/context/Tr2RenderContext.js";
+import { Tr2RenderJobs } from "../../src/trinity/renderJob/Tr2RenderJobs.js";
 import { SetTextureHost } from "./ShatteredTextures.js";
 
 const SHADER_MODELS = Object.freeze({
@@ -26,6 +27,93 @@ export function SetBuiltInEffectPaths({ blit, blitFiltered } = {})
 {
   if (blit) Tr2Blitter.blitEffectPath = blit;
   if (blitFiltered) Tr2Blitter.blitFilteredEffectPath = blitFiltered;
+}
+
+let bootedDevice = null;
+let singleJob = null;
+
+/**
+ * The canvas as a render target, the same call on WebGPU and WebGL2. Bind it with
+ * `backend.al.SetRenderTarget(0, GetCanvasTarget(backend))` (and `backend.al.SetDepthStencil(null)`),
+ * then set a viewport: `renderContext.GetEffectStateManager().SetViewport({ x, y, width, height })`
+ * in canvas pixels with the origin at the top left, or `SetFullScreenViewport()` after an offscreen
+ * target of the canvas's size was bound. `ShatteredBoot` also puts this on the backend it returns as
+ * `backend.GetCanvasTarget()`.
+ *
+ * @param {object} backend The backend `ShatteredBoot` returned.
+ * @returns {object} The canvas target for `SetRenderTarget`.
+ */
+export function GetCanvasTarget(backend)
+{
+  return backend.al.GetDefaultBackBuffer();
+}
+
+/**
+ * Draws now: runs render jobs exactly once, inside one device frame, before returning.
+ *
+ * With a job, only that job runs (it need not be registered with the device, and its `enabled` flag
+ * still applies). With no argument, every job installed on the device runs once, in order. Nothing
+ * else happens: no resource loading is pumped, no Blue ticker runs, the animation clock does not move.
+ * It may be called any number of times in one task, for example once per view drawn into its own
+ * viewport of the canvas; each call is one complete frame for the device (its own command buffer).
+ *
+ * `blue.os.PumpOS()` also runs the device's jobs exactly once per call - PumpOS calls every ticker
+ * once, the device's tick calls `Render` once, and nothing in between is gated on time - but it pumps
+ * loading and presents as well. A host that draws several views a frame calls `PumpLoading()` once and
+ * `DrawNow(job)` per view.
+ *
+ * @param {object} [job] A `TriRenderJob`; omitted, the device's installed jobs.
+ * @returns {number|undefined} The job's status after the run (`TriRenderJob.Status`), when a job was given.
+ */
+export function DrawNow(job = null)
+{
+  const device = bootedDevice;
+  if (!device) throw new Error("DrawNow needs ShatteredBoot to have run");
+  if (!job)
+  {
+    device.Render();
+    return undefined;
+  }
+  const installed = device.GetRenderJobs();
+  singleJob ??= new Tr2RenderJobs();
+  singleJob.recurring.Clear();
+  singleJob.recurring.push(job);
+  device.SetRenderJobs(singleJob);
+  try
+  {
+    device.Render();
+  }
+  finally
+  {
+    device.SetRenderJobs(installed);
+    singleJob.recurring.Clear();
+  }
+  return job.status;
+}
+
+/**
+ * One Blue tick with no render job run: resources finish loading (`blue.resMan.Ready` resolves),
+ * callbacks and curve sets run, a lost device is noticed and replaced, and nothing is drawn. The
+ * canvas keeps its picture. Call it every animation frame while the host draws with `DrawNow`, and
+ * while waiting on a load when the installed jobs must not run.
+ *
+ * (To silence one job instead, set its `enabled = false`: a disabled job is skipped by `PumpOS` and
+ * by `DrawNow`.)
+ */
+export function PumpLoading()
+{
+  const device = bootedDevice;
+  if (!device) throw new Error("PumpLoading needs ShatteredBoot to have run");
+  const installed = device.GetRenderJobs();
+  device.SetRenderJobs(null);
+  try
+  {
+    blue.os.PumpOS();
+  }
+  finally
+  {
+    device.SetRenderJobs(installed);
+  }
 }
 
 /**
@@ -67,6 +155,8 @@ export async function ShatteredBoot({ canvas, res, preference = [ "webgpu", "web
   Tr2Renderer.SetShaderModel(SHADER_MODELS[shaderModel]);
   device.width = canvas.width;
   device.height = canvas.height;
+  bootedDevice = device;
+  backend.GetCanvasTarget = () => GetCanvasTarget(backend);
   return {
     library, backend, device,
     renderContext: Tr2RenderContext_GetMainThreadRenderContext(),

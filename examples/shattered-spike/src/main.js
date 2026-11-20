@@ -13,6 +13,11 @@
 //   backend=webgl2  ask for the WebGL2 backend only (default: WebGPU, then WebGL2)
 //   backdrop=1   a textured full-screen quad behind the ship: a JPEG from a URL, a PNG through resMan
 //                and a canvas drawn here, all read through samplers (effects/backdrop.fx)
+//   views=N      N views a frame, each drawn by its own call into its own viewport of the canvas (a grid with
+//                gutters cleared to a known colour); draw=now uses DrawNow(job) (default), draw=pump registers
+//                the job and calls blue.os.PumpOS() per view. window.__spike.views reports job runs per frame.
+//   lateload=1   after a few frames, loads a PNG through resMan while only PumpLoading() is called, then
+//                stops drawing: the job must not run during the load and the canvas must keep its picture
 //   filter=point the backdrop point-sampled instead of trilinear; zoom=N scales its UVs (N > 1 minifies)
 import {
   blue, BlueScriptCallback, mat4, vec3, DepthStencilFormat, PixelFormat, ShaderType, TriBatchType,
@@ -20,7 +25,7 @@ import {
   ITr2Renderable, TriView, TriProjection, RawData, CjsConstantLayout, TriGeometryRes, Tr2Effect, Tr2EffectStateManager,
   Tr2RenderJobs, TriRenderJob, TriStepClear, TriStepPythonCB, TriStepRenderEffect, TriStepRenderObject,
   TriStepSetProjection, TriStepSetView, Tr2ConstantBufferAL, ShatteredBoot,
-  LoadTexture, CreateTextureFromImage, UpdateTextureFromImage
+  LoadTexture, CreateTextureFromImage, UpdateTextureFromImage, DrawNow, PumpLoading, GetCanvasTarget
 } from "@geravant/carbon-runtime-slim";
 
 const T0 = performance.now();
@@ -39,6 +44,11 @@ const BACKEND = params.get("backend");
 const BACKDROP = params.get("backdrop") === "1";
 const FILTER_POINT = params.get("filter") === "point";
 const ZOOM = Number(params.get("zoom") ?? 1);
+const VIEWS = Math.max(0, Number(params.get("views") ?? 0) | 0);
+const DRAW = params.get("draw") ?? "now";
+const LATE_LOAD = params.get("lateload") === "1";
+// The colour the canvas is cleared to between views: any pixel of it left in a view, or missing from a gutter, is a viewport fault.
+const GUTTER = [ 0.2, 0.6, 0.4, 1 ];
 
 const spike = window.__spike = { ready: false, error: null, frames: 0, firstFrameMs: null, bench: null, diagnostics: [] };
 
@@ -201,13 +211,12 @@ async function Main()
     const info = gl.getExtension("WEBGL_debug_renderer_info");
     spike.adapter = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : String(gl.getParameter(gl.RENDERER));
   }
-  // The canvas as a render target: WebGPU's is the backend's own, WebGL2's is the layer's default back buffer.
-  const canvasTarget = () => (backend.name === "webgpu" ? backend.renderTarget : backend.al.GetDefaultBackBuffer());
-
+  // The canvas as a render target: one call on both backends (also backend.GetCanvasTarget()).
+  const canvasTarget = () => GetCanvasTarget(backend);
 
   // Blue is host-pumped: resources only finish loading while something calls PumpOS.
   let loading = true;
-  const pump = () => { if (!loading) return; blue.os.PumpOS(); requestAnimationFrame(pump); };
+  const pump = () => { if (!loading) return; PumpLoading(); requestAnimationFrame(pump); };
   requestAnimationFrame(pump);
 
   const [ { geometry, meta }, hullEffect, normalEffect, paintEffect ] = await Promise.all([
@@ -306,7 +315,13 @@ async function Main()
   const viewProjection = mat4.create();
   const viewMatrix = mat4.create();
   const eye = vec3.create();
-  const state = { time: 0, yaw: HELD_YAW ?? 0 };
+  // state.view: the canvas rectangle being drawn ({ x, y, width, height, yaw, clear }), or null for the whole canvas.
+  const state = { time: 0, yaw: HELD_YAW ?? 0, view: null, runs: 0 };
+  const sceneViewport = () =>
+  {
+    if (state.view) esm().SetViewport({ x: 0, y: 0, width: state.view.width, height: state.view.height });
+    else esm().SetFullScreenViewport();
+  };
 
   const esm = () => renderContext.GetEffectStateManager();
   const callback = fn =>
@@ -340,6 +355,9 @@ async function Main()
   paint.effect = paintEffect;
   const backdrop = new TriStepRenderEffect();
   backdrop.effect = backdropEffect;
+  const clearCanvas = new TriStepClear();
+  clearCanvas.color.set(GUTTER);
+  clearCanvas.isColorCleared = clearCanvas.isDepthCleared = false;
 
   const job = new TriRenderJob();
   job.name = "ShatteredSpike";
@@ -347,7 +365,9 @@ async function Main()
     // Update: the camera, the ships.
     callback(() =>
     {
-      const aspect = canvas.width / canvas.height;
+      state.runs++;
+      if (state.view) state.yaw = state.view.yaw;
+      const aspect = state.view ? state.view.width / state.view.height : canvas.width / canvas.height;
       const height = extent * 2 / aspect;
       const distance = extent * 4;
       if (CAMERA === "flyby")
@@ -376,6 +396,7 @@ async function Main()
       esm().SetFullScreenViewport();
     }),
     clear(),
+    callback(sceneViewport),
     setView,
     setProjection,
     // Our per-frame constants, from the view and projection the two steps above set on the renderer.
@@ -402,6 +423,7 @@ async function Main()
       esm().SetFullScreenViewport();
     }),
     clear(),
+    callback(sceneViewport),
     renderFleet(normalEffect),
     // Pass 3: onto the canvas. The backdrop first when asked for, then the watercolour pass over both targets.
     callback(() =>
@@ -409,6 +431,10 @@ async function Main()
       backend.al.SetRenderTarget(0, canvasTarget());
       backend.al.SetDepthStencil(null);
       esm().SetFullScreenViewport();
+      // The first view of a frame clears the whole canvas to the gutter colour; the others must leave it alone.
+      clearCanvas.isColorCleared = !!state.view?.clear;
+      const rect = state.view;
+      paintEffect.SetParameter__Vector4("ViewRect", rect ? [ rect.x, rect.y, rect.width, rect.height ] : [ 0, 0, 0, 0 ]);
       paintEffect.SetParameter__TextureAL("SceneColour", colourTarget.GetRenderTarget());
       paintEffect.SetParameter__TextureAL("SceneNormal", normalTarget.GetRenderTarget());
       // The canvas texture is redrawn and uploaded again twice a second.
@@ -420,13 +446,31 @@ async function Main()
         spike.canvasUploads = (spike.canvasUploads ?? 1) + 1;
       }
     }),
+    clearCanvas,
+    // The viewport on the canvas, after the clear (which covers the whole target).
+    callback(() => { if (state.view) esm().SetViewport({ x: state.view.x, y: state.view.y, width: state.view.width, height: state.view.height }); }),
     ...(BACKDROP ? [ backdrop ] : []),
     paint
   ]) job.steps.push(step);
 
-  const jobs = device.GetRenderJobs() ?? new Tr2RenderJobs();
-  jobs.recurring.push(job);
-  device.SetRenderJobs(jobs);
+  // The job is registered with the device unless each view is drawn by DrawNow(job).
+  const registered = !(VIEWS && DRAW === "now");
+  if (registered)
+  {
+    const jobs = device.GetRenderJobs() ?? new Tr2RenderJobs();
+    jobs.recurring.push(job);
+    device.SetRenderJobs(jobs);
+  }
+  // A grid of views with gutters, in canvas pixels.
+  const views = [];
+  if (VIEWS)
+  {
+    const gutter = 24, columns = Math.ceil(Math.sqrt(VIEWS)), rows = Math.ceil(VIEWS / columns);
+    const width = Math.floor((canvas.width - gutter * (columns + 1)) / columns), height = Math.floor((canvas.height - gutter * (rows + 1)) / rows);
+    for (let i = 0; i < VIEWS; i++)
+      views.push({ x: gutter + (i % columns) * (width + gutter), y: gutter + Math.floor(i / columns) * (height + gutter), width, height, yaw: i * Math.PI * 2 / VIEWS + 0.5, clear: i === 0 });
+    spike.views = { count: VIEWS, draw: DRAW, rects: views.map(v => [ v.x, v.y, v.width, v.height ]), gutter: GUTTER.map(v => Math.round(v * 255)), runsPerFrame: [] };
+  }
 
   loading = false;
   // The frame loop: Blue's tick runs Trinity, which runs the device's render jobs.
@@ -448,8 +492,43 @@ async function Main()
       if (HELD_YAW === null) state.yaw += dt * 0.5;
     }
     const before = performance.now();
-    blue.os.PumpOS();
+    if (spike.frozen)
+    {
+      // Nothing is drawn any more; loading is still pumped. The canvas has to keep its last picture.
+      PumpLoading();
+      return;
+    }
+    if (VIEWS)
+    {
+      // Several views in one task, one call each. Loading is pumped once, without drawing.
+      const runsBefore = state.runs;
+      if (DRAW === "now") PumpLoading();
+      for (const rect of views)
+      {
+        state.view = rect;
+        if (DRAW === "now") DrawNow(job);
+        else blue.os.PumpOS();
+      }
+      state.view = null;
+      if (spike.views.runsPerFrame.length < 8) spike.views.runsPerFrame.push(state.runs - runsBefore);
+    }
+    else blue.os.PumpOS();
     const cpu = performance.now() - before;
+    if (LATE_LOAD && spike.frames === 6 && !spike.lateLoad)
+    {
+      // A load that starts while the job is registered: only PumpLoading runs until it resolves.
+      spike.lateLoad = { started: true };
+      spike.frozen = true;
+      const runsBefore = state.runs;
+      const resource = blue.resMan.GetResource("res:/textures/marker.png");
+      let pumps = 0;
+      const count = setInterval(() => pumps++, 4);
+      blue.resMan.Ready(resource).then(() =>
+      {
+        clearInterval(count);
+        spike.lateLoad = { loaded: resource.IsGood(), size: [ resource.GetWidth(), resource.GetHeight() ], jobRunsDuringLoad: state.runs - runsBefore, registered };
+      });
+    }
     spike.frames++;
     if (spike.firstFrameMs === null) spike.firstFrameMs = performance.now() - T0;
     // The frame's whole cost, CPU and GPU: from before the tick until the GPU reports the submitted work done.
@@ -476,6 +555,22 @@ async function Main()
         const luma = (data[i] * 3 + data[i + 1] * 6 + data[i + 2]) / 10;
         sum += luma;
         if (luma < 150) dark++;
+      }
+      if (VIEWS)
+      {
+        // Every third pixel: inside a view nothing may be the gutter colour, outside everything must be.
+        const px = (x, y) => { const o = (y * canvas.width + x) * 4; return [ data[o], data[o + 1], data[o + 2] ]; };
+        const isGutter = c => Math.abs(c[0] - spike.views.gutter[0]) + Math.abs(c[1] - spike.views.gutter[1]) + Math.abs(c[2] - spike.views.gutter[2]) <= 3;
+        let gutterInside = 0, pictureOutside = 0, insideSamples = 0, outsideSamples = 0;
+        for (let y = 0; y < canvas.height; y += 3) for (let x = 0; x < canvas.width; x += 3)
+        {
+          const inside = views.some(v => x >= v.x && x < v.x + v.width && y >= v.y && y < v.y + v.height);
+          const gutter = isGutter(px(x, y));
+          if (inside) { insideSamples++; if (gutter) gutterInside++; }
+          else { outsideSamples++; if (!gutter) pictureOutside++; }
+        }
+        spike.views.check = { insideSamples, gutterInside, outsideSamples, pictureOutside,
+          edges: views.map(v => ({ justInside: px(v.x, v.y), justOutside: px(v.x - 1, v.y - 1), lastInside: px(v.x + v.width - 1, v.y + v.height - 1), firstOutside: px(v.x + v.width, v.y + v.height), centre: px(v.x + (v.width >> 1), v.y + (v.height >> 1)) })) };
       }
       const samples = Math.ceil(data.length / 28);
       // Luma statistics of the backdrop's checker as drawn. Magnified (zoom < 1), point sampling leaves two tones
