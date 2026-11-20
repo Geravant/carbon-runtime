@@ -227,6 +227,7 @@ async function Main()
   device.width = canvas.width;
   device.height = canvas.height;
   spike.backendName = backend.name;
+  spike.adapter = await navigator.gpu.requestAdapter().then(a => a?.info ? `${a.info.vendor} ${a.info.architecture} ${a.info.device} ${a.info.description}`.trim() : "unknown");
 
   const renderContext = Tr2RenderContext_GetMainThreadRenderContext();
 
@@ -263,7 +264,7 @@ async function Main()
     ship.phase = SHIPS === 1 ? 0 : i * 0.9;
     fleet.ships.push(ship);
   }
-  const extent = SHIPS === 1 ? meta.radius * 1.15 : Math.hypot(columns * spacingX, rows * spacingZ) * 0.5 + meta.radius * 0.3;
+  const extent = SHIPS === 1 ? meta.radius * 1.15 : columns * spacingX * 0.5 + meta.radius * 0.2;
 
   // The scene's targets: colour (rgb the wash, a the hull's coverage), normal (rgb view normal,
   // a depth) and a depth buffer, all the canvas's size.
@@ -328,7 +329,7 @@ async function Main()
     callback(() =>
     {
       const aspect = canvas.width / canvas.height;
-      const height = SHIPS === 1 ? extent * 2 / aspect : Math.max(extent * 2, extent * 2 / aspect);
+      const height = extent * 2 / aspect;
       const distance = extent * 4;
       if (CAMERA === "flyby")
       {
@@ -402,6 +403,7 @@ async function Main()
   loading = false;
   // The frame loop: Blue's tick runs Trinity, which runs the device's render jobs.
   const frameTimes = [];
+  const gpuDevice = backend.webgpu.GetDevice();
   let last = performance.now();
   const tick = now =>
   {
@@ -418,19 +420,25 @@ async function Main()
     const cpu = performance.now() - before;
     spike.frames++;
     if (spike.firstFrameMs === null) spike.firstFrameMs = performance.now() - T0;
+    // The frame's whole cost, CPU and GPU: from before the tick until the GPU reports the submitted work done.
+    if (BENCH && !spike.bench && frameTimes.length < BENCH && spike.frames > 20)
+    {
+      const index = frameTimes.length;
+      gpuDevice.queue.onSubmittedWorkDone().then(() => { if (frameTimes[index]) frameTimes[index].done = performance.now() - before; });
+    }
     if (BENCH && spike.frames > 20 && !spike.bench)
     {
       frameTimes.push({ interval: dt * 1000, cpu });
-      if (frameTimes.length >= BENCH)
+      if (frameTimes.length >= BENCH) setTimeout(() =>
       {
-        const sorted = key => frameTimes.map(entry => entry[key]).sort((a, b) => a - b);
+        const sorted = key => frameTimes.map(entry => entry[key]).filter(value => value !== undefined).sort((a, b) => a - b);
         const summary = key =>
         {
           const values = sorted(key);
           return { mean: values.reduce((sum, value) => sum + value, 0) / values.length, median: values[values.length >> 1], p95: values[Math.floor(values.length * 0.95)] };
         };
-        spike.bench = { ships: SHIPS, frames: frameTimes.length, width: canvas.width, height: canvas.height, interval: summary("interval"), cpu: summary("cpu") };
-      }
+        spike.bench ??= { adapter: spike.adapter, ships: SHIPS, frames: frameTimes.length, width: canvas.width, height: canvas.height, interval: summary("interval"), cpu: summary("cpu"), submitToDone: summary("done") };
+      }, 200);
     }
     const diagnostics = renderContext.GetDiagnostics();
     if (diagnostics.length)

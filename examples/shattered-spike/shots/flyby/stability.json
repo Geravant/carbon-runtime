@@ -1,0 +1,31 @@
+{
+ "camera": "flyby",
+ "step": 0.016666666666666666,
+ "note": "share of pixels whose colour changes by more than 8 (changed) and 48 (strong) of 255 between two frames 1/60 s apart",
+ "stability": [
+  {
+   "t": 1,
+   "changedPercent": 1.785,
+   "strongPercent": 0.414,
+   "meanDifference": 0.773
+  },
+  {
+   "t": 2.5,
+   "changedPercent": 5.222,
+   "strongPercent": 0.862,
+   "meanDifference": 1.967
+  },
+  {
+   "t": 4,
+   "changedPercent": 6.83,
+   "strongPercent": 1.262,
+   "meanDifference": 2.822
+  },
+  {
+   "t": 5.5,
+   "changedPercent": 4.833,
+   "strongPercent": 0.912,
+   "meanDifference": 1.966
+  }
+ ]
+}

@@ -1,24 +1,11 @@
 [
  {
   "path": "index.html",
-  "bytes": 627
+  "bytes": 659
  },
  {
   "path": "dist/spike.js",
-  "bytes": 16120645
- },
- {
-  "path": "favicon.ico",
-  "bytes": 0,
-  "missing": true
- },
- {
-  "path": "data/cruiser.json",
-  "bytes": 8768
- },
- {
-  "path": "data/cruiser.bin",
-  "bytes": 823440
+  "bytes": 5784174
  },
  {
   "path": "res/graphics/effect.webgpu/managed/space/system/blit.sm_depth",
@@ -27,6 +14,14 @@
  {
   "path": "res/graphics/effect.webgpu/managed/space/system/blitfiltered.sm_depth",
   "bytes": 2592
+ },
+ {
+  "path": "data/cruiser.json",
+  "bytes": 8768
+ },
+ {
+  "path": "data/cruiser.bin",
+  "bytes": 823440
  },
  {
   "path": "res/graphics/effect.webgpu/shattered/hull.sm_depth",
