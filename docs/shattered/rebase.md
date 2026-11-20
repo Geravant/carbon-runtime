@@ -70,3 +70,4 @@ Commit the merge, push (`git -c http.postBuffer=157286400 push origin shattered/
 | Date | Upstream `main` | Result |
 |---|---|---|
 | 2026-11-20 | `36b192a00` (0.1.0-alpha.14, 2026-11-16) | Fetched; upstream had not moved since the spike branched (0 commits ahead). Nothing to merge, no conflicts. |
+| 2026-11-20 (later) | `36b192a00` | Fetched again before the scene-capabilities tarball (`3c357ae7c`): 0 commits ahead. Nothing to merge, no conflicts. |
