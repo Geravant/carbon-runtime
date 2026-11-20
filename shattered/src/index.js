@@ -38,4 +38,10 @@ export { screenToProjection } from "../../src/trinity/core/view/pickRay.js";
 export { CjsConstantLayout } from "../../src/trinity/core/rawData/CjsConstantLayout.js";
 export { CjsLibrary } from "../../src/core/CjsLibrary.js";
 export * from "./ShatteredRuntime.js";
-export { CreateTextureFromImage, UpdateTextureFromImage, LoadTexture } from "./ShatteredTextures.js";
+export { CreateTextureFromImage, UpdateTextureFromImage, LoadTexture, ReleaseTexture,
+  CreateTextureFromData, UpdateTextureFromData, ToHalfFloat } from "./ShatteredTextures.js";
+export { ReleaseGeometry, GeometryPoolStats, RegisteredResourceCount } from "./ShatteredGeometry.js";
+export { CurveLineSpans, LINE_SPAN_ROW } from "./ShatteredLineSpans.js";
+export { TimeJob, TimeJobNow, GpuTimingMethod } from "./ShatteredGpuTiming.js";
+export { OrbitCamera } from "./OrbitCamera.js";
+export { InstanceStream } from "./InstanceStream.js";

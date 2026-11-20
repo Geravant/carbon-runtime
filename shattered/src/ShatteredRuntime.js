@@ -10,6 +10,8 @@ import { Tr2RenderContext_GetMainThreadRenderContext } from "../../src/trinity/c
 import { Tr2RenderJobs } from "../../src/trinity/renderJob/Tr2RenderJobs.js";
 import { EffectKeyGenerator } from "../../src/trinity/core/batch/TriRenderBatch/EffectKeyGenerator.js";
 import { SetTextureHost } from "./ShatteredTextures.js";
+import { SetTimingHost } from "./ShatteredGpuTiming.js";
+import { Tr2PlatformInfo } from "../../src/core/platform/Tr2PlatformInfo.js";
 
 const SHADER_MODELS = Object.freeze({
   depth: TR2SHADERMODEL.TR2SM_3_0_DEPTH, hi: TR2SHADERMODEL.TR2SM_3_0_HI, lo: TR2SHADERMODEL.TR2SM_3_0_LO
@@ -118,6 +120,28 @@ export function PumpLoading()
 }
 
 /**
+ * The engine's own WebGPU device request (CjsBrowserBackend's RequestWebgpuDevice default: the same features
+ * where the adapter has them, the same limits), plus `extra` features the adapter has. Null with no adapter, so
+ * the backend's own fallback runs.
+ */
+async function WebgpuDeviceRequest(extra)
+{
+  const adapter = await globalThis.navigator?.gpu?.requestAdapter?.().catch(() => null);
+  if (!adapter) return null;
+  const compressed = adapter.features.has("texture-compression-bc");
+  const wanted = [ compressed && "texture-compression-bc", compressed && "texture-compression-bc-sliced-3d",
+    "float32-filterable", "float32-blendable", "depth-clip-control", "texture-formats-tier2", ...extra ];
+  return {
+    requiredFeatures: wanted.filter(feature => feature && adapter.features.has(feature)),
+    requiredLimits: {
+      maxStorageTexturesPerShaderStage: Math.min(16, adapter.limits.maxStorageTexturesPerShaderStage),
+      maxTextureDimension2D: Math.min(16384, adapter.limits.maxTextureDimension2D),
+      maxBufferSize: Math.min(Tr2PlatformInfo.webgpuMaxBufferSize, adapter.limits.maxBufferSize)
+    }
+  };
+}
+
+/**
  * Starts the engine on a canvas for a host that brings all of its own content: effects already
  * compiled for the backend (no DXBC translator), no ship assembly, character or audio services,
  * no callback workers.
@@ -136,10 +160,12 @@ export function PumpLoading()
  * @param {object} [options.effectPaths] `SetBuiltInEffectPaths` argument.
  * @param {"opaque"|"premultiplied"} [options.alphaMode="opaque"] Canvas compositing.
  * @param {object} [options.configuration] Further `CjsLibrary` configuration sections.
+ * @param {boolean} [options.gpuTimer=false] On WebGPU, also ask for the `timestamp-query` feature (where the
+ *   adapter has it), so `TimeJob` measures a job's GPU time with timestamps. No effect on WebGL2.
  * @returns {Promise<{library: CjsLibrary, backend: object, device: object, renderContext: object, effectTarget: string}>}
  */
 export async function ShatteredBoot({ canvas, res, preference = [ "webgpu", "webgl2" ], shaderModel = "depth", effectPaths = null,
-  alphaMode = "opaque", configuration = {} } = {})
+  alphaMode = "opaque", configuration = {}, gpuTimer = false } = {})
 {
   if (!Object.hasOwn(SHADER_MODELS, shaderModel)) throw new RangeError(`shaderModel must be one of ${Object.keys(SHADER_MODELS).join(", ")}`);
   if (effectPaths) SetBuiltInEffectPaths(effectPaths);
@@ -152,10 +178,12 @@ export async function ShatteredBoot({ canvas, res, preference = [ "webgpu", "web
 
   const library = new CjsLibrary({ callbackMan: { useWorkers: false }, ...configuration });
   // translator: false - GetEffectConfiguration then names the backend's own effect tree.
-  const backend = await library.AcquireBackend({ canvas, preference, alphaMode, shaderModel, translator: false });
+  const webgpuDevice = gpuTimer && preference[0] === "webgpu" ? await WebgpuDeviceRequest([ "timestamp-query" ]) : null;
+  const backend = await library.AcquireBackend({ canvas, preference, alphaMode, shaderModel, translator: false, webgpuDevice });
   const resRoot = new URL(res, globalThis.location?.href).href;
   library.SetConfiguration({ paths: { host: new CjsBlueResFileSystemFetch({ paths: { res: resRoot } }) } });
   SetTextureHost(resRoot, backend);
+  SetTimingHost(backend);
   // Explicit nulls: with the keys absent, Initialize constructs EVE's SOF and character library.
   await library.Initialize({ sof: null, characterLibrary: null });
   const device = library.AttachTrinity({ renderContextAL: backend.al, backend: backend.name });

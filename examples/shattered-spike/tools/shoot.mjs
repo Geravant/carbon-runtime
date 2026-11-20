@@ -88,7 +88,7 @@ async function open(query)
   // WebGPU adapter, so reaching WebGL2 is the engine's own fallback. --force-backend asks for it by name.
   await page.goto(`${base}${option("--page", "index.html")}?${flag("--force-backend") ? `backend=${BACKEND}&` : ""}${query}`);
   await page.waitForFunction(() => window.__spike && (window.__spike.error || (window.__spike.ready && window.__spike.frames > 5)), null, { timeout: Number(option("--wait", 20000)) }).catch(() => {});
-  const state = await page.evaluate(() => ({ ready: window.__spike?.ready, error: window.__spike?.error, frames: window.__spike?.frames, firstFrameMs: window.__spike?.firstFrameMs, backend: window.__spike?.backendName, adapter: window.__spike?.adapter, diagnostics: (window.__spike?.diagnostics ?? []).slice(0, 6), jobStatus: window.__spike?.status?.(), scene: window.__spike?.scene, textures: window.__spike?.textures, canvasUploads: window.__spike?.canvasUploads }));
+  const state = await page.evaluate(() => ({ ready: window.__spike?.ready, error: window.__spike?.error, frames: window.__spike?.frames, firstFrameMs: window.__spike?.firstFrameMs, backend: window.__spike?.backendName, adapter: window.__spike?.adapter, diagnostics: (window.__spike?.diagnostics ?? []).slice(0, 6), jobStatus: window.__spike?.status?.(), scene: window.__spike?.scene, textures: window.__spike?.textures, canvasUploads: window.__spike?.canvasUploads, requests: window.__spike?.requests, allOk: window.__spike?.allOk }));
   state.wallMs = Date.now() - started;
   state.webgpuAdapter = await page.evaluate(async () => !!(navigator.gpu && await navigator.gpu.requestAdapter().catch(() => null)));
   if (state.backend !== BACKEND) failed = true;
@@ -98,6 +98,9 @@ async function open(query)
   state.views = await page.evaluate(() => window.__spike?.views ?? null) ?? undefined;
   if (state.views && !(state.views.check?.gutterInside === 0 && state.views.check?.pictureOutside === 0 && state.views.runsPerFrame.every(runs => runs === state.views.count))) failed = true;
   if (!state.ready || state.error || state.diagnostics.length || !(state.canvasRead?.distinctColours > 50)) failed = true;
+  // The request proof page (requests.html) says itself whether every check held.
+  if (state.requests && state.allOk !== true) failed = true;
+  if (state.requests) await writeFile(join(shots, `proof-${BACKEND}-${GPU}.json`), `${JSON.stringify({ backend: state.backend, gpu: GPU, allOk: state.allOk, warmupFrames: await page.evaluate(() => window.__spike.warmupFrames), requests: state.requests }, null, 1)}\n`);
   return { page, state };
 }
 
