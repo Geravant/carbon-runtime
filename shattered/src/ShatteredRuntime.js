@@ -7,6 +7,7 @@ import { TR2SHADERMODEL } from "../../src/global/consts/graphics/trinityEnums.js
 import { Tr2Blitter } from "../../src/trinity/core/Tr2Blitter.js";
 import { Tr2Renderer } from "../../src/trinity/core/Tr2Renderer.js";
 import { Tr2RenderContext_GetMainThreadRenderContext } from "../../src/trinity/core/context/Tr2RenderContext.js";
+import { SetTextureHost } from "./ShatteredTextures.js";
 
 const SHADER_MODELS = Object.freeze({
   depth: TR2SHADERMODEL.TR2SM_3_0_DEPTH, hi: TR2SHADERMODEL.TR2SM_3_0_HI, lo: TR2SHADERMODEL.TR2SM_3_0_LO
@@ -57,7 +58,9 @@ export async function ShatteredBoot({ canvas, res, preference = [ "webgpu", "web
   const library = new CjsLibrary({ callbackMan: { useWorkers: false }, ...configuration });
   // translator: false - GetEffectConfiguration then names the backend's own effect tree.
   const backend = await library.AcquireBackend({ canvas, preference, alphaMode, shaderModel, translator: false });
-  library.SetConfiguration({ paths: { host: new CjsBlueResFileSystemFetch({ paths: { res: new URL(res, globalThis.location?.href).href } }) } });
+  const resRoot = new URL(res, globalThis.location?.href).href;
+  library.SetConfiguration({ paths: { host: new CjsBlueResFileSystemFetch({ paths: { res: resRoot } }) } });
+  SetTextureHost(resRoot, backend);
   // Explicit nulls: with the keys absent, Initialize constructs EVE's SOF and character library.
   await library.Initialize({ sof: null, characterLibrary: null });
   const device = library.AttachTrinity({ renderContextAL: backend.al, backend: backend.name });

@@ -25,7 +25,7 @@ const option = (name, fallback) => (args.includes(name) ? args[args.indexOf(name
 const root = option("--root") ? resolve(option("--root")) : join(here, "..");
 const shotsRoot = join(here, "..", "shots");
 
-const TYPES = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".bin": "application/octet-stream", ".png": "image/png" };
+const TYPES = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".bin": "application/octet-stream", ".png": "image/png", ".jpg": "image/jpeg" };
 const BACKEND = option("--backend", "webgpu");
 const GPU = option("--gpu", process.platform === "darwin" ? "metal" : "swiftshader");
 const OUT = option("--out", "");
@@ -88,7 +88,7 @@ async function open(query)
   // WebGPU adapter, so reaching WebGL2 is the engine's own fallback. --force-backend asks for it by name.
   await page.goto(`${base}index.html?${flag("--force-backend") ? `backend=${BACKEND}&` : ""}${query}`);
   await page.waitForFunction(() => window.__spike && (window.__spike.error || (window.__spike.ready && window.__spike.frames > 5)), null, { timeout: Number(option("--wait", 20000)) }).catch(() => {});
-  const state = await page.evaluate(() => ({ ready: window.__spike?.ready, error: window.__spike?.error, frames: window.__spike?.frames, firstFrameMs: window.__spike?.firstFrameMs, backend: window.__spike?.backendName, adapter: window.__spike?.adapter, diagnostics: (window.__spike?.diagnostics ?? []).slice(0, 6), jobStatus: window.__spike?.status?.() }));
+  const state = await page.evaluate(() => ({ ready: window.__spike?.ready, error: window.__spike?.error, frames: window.__spike?.frames, firstFrameMs: window.__spike?.firstFrameMs, backend: window.__spike?.backendName, adapter: window.__spike?.adapter, diagnostics: (window.__spike?.diagnostics ?? []).slice(0, 6), jobStatus: window.__spike?.status?.(), textures: window.__spike?.textures, canvasUploads: window.__spike?.canvasUploads }));
   state.wallMs = Date.now() - started;
   state.webgpuAdapter = await page.evaluate(async () => !!(navigator.gpu && await navigator.gpu.requestAdapter().catch(() => null)));
   if (state.backend !== BACKEND) failed = true;

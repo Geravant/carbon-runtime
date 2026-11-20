@@ -42,6 +42,13 @@ float4 PaperColour
     string UIWidget = "LinearColor";
 > = float4( 0.958, 0.938, 0.897, 1.0 );
 
+float4 BackdropMix
+<
+    bool SasUiVisible = true;
+    string Group = "Watercolour";
+    string SasUiDescription = "( 1 = the paper is transparent away from hulls, so a picture drawn first shows; unused x3 )";
+> = float4( 0.0, 0.0, 0.0, 0.0 );
+
 struct WatercolourVSInput
 {
     float4 position : POSITION;
@@ -144,6 +151,7 @@ float4 WatercolourPS( float4 position : SV_Position ) : SV_Target
 
     float4 c = ColourAt( pixel, size );
     float4 n = NormalAt( pixel, size );
+    float alpha = 1.0;
 
     // The wash: a cool pool round each hull, its edge wandering with the paper.
     float wander = ( fbm2( p * 9.0 + 3.0 ) - 0.5 ) * 0.5;
@@ -176,8 +184,10 @@ float4 WatercolourPS( float4 position : SV_Position ) : SV_Target
         // A faint halo under the line, then the line.
         col *= 1.0 - Coverage( pixel, 3.0, size ) * 0.12;
         col = lerp( col, InkColour.rgb * ( 0.92 + 0.16 * noise2( p * 300.0 ) ), e * 0.93 );
+        // Over a backdrop only the ink and the pooled wash stay; the bare paper lets the picture through.
+        alpha = lerp( 1.0, saturate( max( e * 0.93, pool * 0.75 ) ), BackdropMix.x );
     }
-    return float4( col, 1.0 );
+    return float4( col, alpha );
 }
 
 technique Main
@@ -187,7 +197,10 @@ technique Main
         ZEnable = false;
         ZWriteEnable = false;
         CullMode = NONE;
-        AlphaBlendEnable = false;
+        // Alpha is 1 everywhere unless BackdropMix asks otherwise, so this is a plain write by default.
+        AlphaBlendEnable = true;
+        SrcBlend = SRCALPHA;
+        DestBlend = INVSRCALPHA;
         VertexShader = compile vs_5_0 WatercolourVS();
         PixelShader = compile ps_5_0 WatercolourPS();
     }

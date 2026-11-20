@@ -11,12 +11,16 @@
 //   paint=0      skip the watercolour pass: the hull's colour target blitted as it is
 //   bench=N      measure N frames and put the result in window.__spike.bench
 //   backend=webgl2  ask for the WebGL2 backend only (default: WebGPU, then WebGL2)
+//   backdrop=1   a textured full-screen quad behind the ship: a JPEG from a URL, a PNG through resMan
+//                and a canvas drawn here, all read through samplers (effects/backdrop.fx)
+//   filter=point the backdrop point-sampled instead of trilinear; zoom=N scales its UVs (N > 1 minifies)
 import {
   blue, BlueScriptCallback, mat4, vec3, DepthStencilFormat, PixelFormat, ShaderType, TriBatchType,
   Tr2Renderer, PER_FRAME_VS, PER_FRAME_PS, Tr2RenderUtils, Tr2RenderTarget, Tr2DepthStencil, Tr2Mesh, Tr2MeshArea,
   ITr2Renderable, TriView, TriProjection, RawData, CjsConstantLayout, TriGeometryRes, Tr2Effect, Tr2EffectStateManager,
   Tr2RenderJobs, TriRenderJob, TriStepClear, TriStepPythonCB, TriStepRenderEffect, TriStepRenderObject,
-  TriStepSetProjection, TriStepSetView, Tr2ConstantBufferAL, ShatteredBoot
+  TriStepSetProjection, TriStepSetView, Tr2ConstantBufferAL, ShatteredBoot,
+  LoadTexture, CreateTextureFromImage, UpdateTextureFromImage
 } from "@geravant/carbon-runtime-slim";
 
 const T0 = performance.now();
@@ -32,6 +36,9 @@ const CAMERA = params.get("camera") ?? "ortho";
 // hold=1: time only moves through window.__spike.setTime, for frame sequences.
 const HOLD = params.get("hold") === "1";
 const BACKEND = params.get("backend");
+const BACKDROP = params.get("backdrop") === "1";
+const FILTER_POINT = params.get("filter") === "point";
+const ZOOM = Number(params.get("zoom") ?? 1);
 
 const spike = window.__spike = { ready: false, error: null, frames: 0, firstFrameMs: null, bench: null, diagnostics: [] };
 
@@ -207,6 +214,49 @@ async function Main()
     LoadHullGeometry(HULL), LoadEffect("hull"), LoadEffect("hullnormal"), LoadEffect("watercolour")
   ]);
 
+  // Our own textures, three ways in: a JPEG by URL through the browser's decoder, a PNG through resMan
+  // and the engine's reader, and a canvas drawn here and uploaded (then redrawn and uploaded again).
+  let backdropEffect = null, drawnCanvas = null, drawnTexture = null;
+  const DrawCanvas = seconds =>
+  {
+    const c = drawnCanvas.getContext("2d");
+    c.clearRect(0, 0, 256, 256);
+    c.fillStyle = "rgba(24, 30, 56, 0.82)";
+    c.fillRect(8, 8, 240, 240);
+    c.strokeStyle = "#f2ead8";
+    c.lineWidth = 3;
+    c.beginPath();
+    for (let i = 0; i <= 64; i++) c.lineTo(16 + i * 3.5, 128 + Math.sin(i * 0.3 + seconds * 2) * 70);
+    c.stroke();
+    c.fillStyle = "#e25c3a";
+    c.font = "700 30px Georgia, serif";
+    c.fillText("canvas", 20, 46);
+  };
+  if (BACKDROP)
+  {
+    backdropEffect = await LoadEffect("backdrop");
+    const backdropTexture = await LoadTexture("res:/textures/backdrop.jpg");
+    const markerTexture = blue.resMan.GetResource("res:/textures/marker.png");
+    await blue.resMan.Ready(markerTexture);
+    if (!markerTexture.IsGood()) throw new Error("the PNG did not load through resMan");
+    drawnCanvas = document.createElement("canvas");
+    drawnCanvas.width = drawnCanvas.height = 256;
+    DrawCanvas(0);
+    drawnTexture = CreateTextureFromImage(drawnCanvas, { name: "drawn-canvas" });
+    backdropEffect.SetParameter__TextureProvider("BackdropMap", backdropTexture);
+    backdropEffect.SetParameter__TextureProvider("BackdropPointMap", backdropTexture);
+    backdropEffect.SetParameter__TextureProvider("MarkerMap", markerTexture);
+    backdropEffect.SetParameter__TextureProvider("CanvasMap", drawnTexture);
+    backdropEffect.SetParameter__Vector4("BackdropTransform", [ ZOOM, ZOOM, 0, 0 ]);
+    backdropEffect.SetParameter__Vector4("BackdropSettings", [ FILTER_POINT ? 1 : 0, 1, 0, 0 ]);
+    paintEffect.SetParameter__Vector4("BackdropMix", [ 1, 0, 0, 0 ]);
+    spike.textures = {
+      backdrop: [ backdropTexture.GetWidth(), backdropTexture.GetHeight(), backdropTexture.GetTexture()?.GetTrueMipCount() ],
+      marker: [ markerTexture.GetWidth(), markerTexture.GetHeight() ],
+      canvas: [ drawnTexture.GetWidth(), drawnTexture.GetHeight() ]
+    };
+  }
+
   const mesh = new Tr2Mesh();
   mesh.name = meta.hull;
   mesh.PySetGeometryRes(geometry);
@@ -288,6 +338,8 @@ async function Main()
   setProjection.projection = projection;
   const paint = new TriStepRenderEffect();
   paint.effect = paintEffect;
+  const backdrop = new TriStepRenderEffect();
+  backdrop.effect = backdropEffect;
 
   const job = new TriRenderJob();
   job.name = "ShatteredSpike";
@@ -351,7 +403,7 @@ async function Main()
     }),
     clear(),
     renderFleet(normalEffect),
-    // Pass 3: the watercolour pass over both, onto the canvas.
+    // Pass 3: onto the canvas. The backdrop first when asked for, then the watercolour pass over both targets.
     callback(() =>
     {
       backend.al.SetRenderTarget(0, canvasTarget());
@@ -359,7 +411,16 @@ async function Main()
       esm().SetFullScreenViewport();
       paintEffect.SetParameter__TextureAL("SceneColour", colourTarget.GetRenderTarget());
       paintEffect.SetParameter__TextureAL("SceneNormal", normalTarget.GetRenderTarget());
+      // The canvas texture is redrawn and uploaded again twice a second.
+      if (drawnTexture && !HOLD && Math.floor(state.time * 2) !== state.drawnAt)
+      {
+        state.drawnAt = Math.floor(state.time * 2);
+        DrawCanvas(state.time);
+        UpdateTextureFromImage(drawnTexture, drawnCanvas);
+        spike.canvasUploads = (spike.canvasUploads ?? 1) + 1;
+      }
     }),
+    ...(BACKDROP ? [ backdrop ] : []),
     paint
   ]) job.steps.push(step);
 
@@ -417,8 +478,23 @@ async function Main()
         if (luma < 150) dark++;
       }
       const samples = Math.ceil(data.length / 28);
+      // Luma statistics of the backdrop's checker as drawn. Magnified (zoom < 1), point sampling leaves two tones
+      // (few mid greys) and linear filtering ramps between them (many).
+      const region = (x0, y0, x1, y1) =>
+      {
+        let n = 0, total = 0, squares = 0, mid = 0;
+        for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++)
+        {
+          const o = (y * canvas.width + x) * 4, luma = (data[o] * 3 + data[o + 1] * 6 + data[o + 2]) / 10;
+          n++; total += luma; squares += luma * luma;
+          if (luma > 90 && luma < 170) mid++;
+        }
+        return { mean: +(total / n).toFixed(2), deviation: +Math.sqrt(Math.max(0, squares / n - (total / n) ** 2)).toFixed(2), midShare: +(mid / n).toFixed(3) };
+      };
       const at = (x, y) => { const o = (Math.floor(y * canvas.height) * canvas.width + Math.floor(x * canvas.width)) * 4; return [ data[o], data[o + 1], data[o + 2], data[o + 3] ]; };
-      resolve({ width: canvas.width, height: canvas.height, distinctColours: colours.size, meanLuma: +(sum / samples).toFixed(2), darkShare: +(dark / samples).toFixed(4), corner: at(0.02, 0.02), centre: at(0.5, 0.5) });
+      resolve({ width: canvas.width, height: canvas.height, distinctColours: colours.size, meanLuma: +(sum / samples).toFixed(2), darkShare: +(dark / samples).toFixed(4), corner: at(0.02, 0.02), centre: at(0.5, 0.5),
+        ...(BACKDROP ? { checker: region(Math.ceil(70 / 1.5 / ZOOM), Math.ceil(70 / 1.5 / ZOOM), Math.floor(250 / 1.5 / ZOOM), Math.floor(250 / 1.5 / ZOOM)),
+          marker: at(0.03 + 0.045, 0.62 + 0.08), drawn: at(0.79 + 0.02, 0.62 + 0.04) } : {}) });
     }
     if (BENCH && spike.frames > 20 && !spike.bench)
     {

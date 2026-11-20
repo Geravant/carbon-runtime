@@ -24,3 +24,4 @@ export * from "../../src/input/index.js";
 export { CjsConstantLayout } from "../../src/trinity/core/rawData/CjsConstantLayout.js";
 export { CjsLibrary } from "../../src/core/CjsLibrary.js";
 export * from "./ShatteredRuntime.js";
+export { CreateTextureFromImage, UpdateTextureFromImage, LoadTexture } from "./ShatteredTextures.js";

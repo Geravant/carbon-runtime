@@ -62,6 +62,40 @@ Blue is pumped by the host: resources finish loading, and render jobs run, only 
 
 On WebGL2 the canvas is `backend.al.GetDefaultBackBuffer()`; on WebGPU it is `backend.renderTarget`.
 
+### Textures (our own images)
+
+PNG, JPEG, WebP or anything else the browser decodes, from a URL or from memory, on both backends:
+
+```js
+import { LoadTexture, CreateTextureFromImage, UpdateTextureFromImage } from "@geravant/carbon-runtime-slim";
+
+const backdrop = await LoadTexture("res:/textures/backdrop.jpg");          // or any URL the page may fetch
+const drawn = CreateTextureFromImage(canvas);                              // canvas, OffscreenCanvas, ImageBitmap, ImageData, <img>
+UpdateTextureFromImage(drawn, canvas);                                     // after redrawing the canvas (same size)
+effect.SetParameter__TextureProvider("BackdropMap", backdrop);             // the Texture2D's name in the .fx
+```
+
+- Both calls return a `TriTextureRes` that is already good (`GetWidth()`, `GetHeight()`, `GetTexture()`). Call them after `ShatteredBoot`; they need no `PumpOS` and may be called between frames or inside a job.
+- The browser decodes (`createImageBitmap`) and the pixels go to the GPU through the layer's external-image upload; nothing is decoded in JS.
+- The texture is RGBA8 holding the file's bytes: sRGB-encoded values as painted, straight (not premultiplied) alpha, row 0 at `v = 0`. A shader that writes them to the canvas unchanged shows the picture as painted.
+- `{ mips: true }` (the default) builds the full mip chain, so `MIN_MAG_MIP_LINEAR` is trilinear. Pass `{ mips: false }` for pictures always drawn 1:1.
+- To free one: `texture.ReleaseResources()`.
+
+In the effect, declare the texture and a sampler and call `Sample`:
+
+```hlsl
+Texture2D BackdropMap;
+SamplerState LinearClamp { Filter = MIN_MAG_MIP_LINEAR; AddressU = CLAMP; AddressV = CLAMP; };
+float4 colour = BackdropMap.Sample( LinearClamp, uv );
+```
+
+Filter (`MIN_MAG_MIP_LINEAR`, `MIN_MAG_MIP_POINT`) and addressing (`CLAMP`, `WRAP`) behave the same on WebGPU and WebGL2 (measured on the spike page: `shots/m3/textures/`). Two rules that differ from plain HLSL:
+
+- **One sampler state per texture name on WebGL2.** GLSL joins a texture and its sampler, and the WebGL2 effect compiler emits one `sampler2D` per `Texture2D`: the first sampler used with it wins, silently. To read one texture both point-sampled and filtered, declare a second `Texture2D` name and bind the same texture to both (`effects/backdrop.fx` does). WebGPU honours every pair as written, so a mistake here shows only on WebGL2.
+- **`Sample` outside branches.** A `Sample` (implicit derivatives) inside an `if` or after an early return fails WGSL validation; sample first, then choose, or use `SampleLevel`.
+
+The engine's own route works too: `blue.resMan.GetResource("res:/textures/marker.png")`, `await blue.resMan.Ready(resource)` (while `PumpOS` is being called), or a path in a `TriTextureParameter` / `effect.SetResourceTexture2D(name, path)`. `.png`, `.jpg` and `.jpeg` are registered. That route decodes with the engine's JS readers on the main thread and makes a texture with no mips, so use it for small images and `LoadTexture` for backdrops.
+
 ### Effects
 
 Effects are HLSL `.fx` files in the engine's effect syntax. The package carries the engine's own effect compiler as a command and as a function:
