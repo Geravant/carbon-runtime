@@ -85,7 +85,7 @@ backend.al.SetDepthStencil(null);
 renderContext.GetEffectStateManager().SetViewport({ x, y, width, height });   // canvas pixels, origin top left
 ```
 
-A viewport set this way on the canvas is honoured to the pixel on WebGPU and WebGL2: in the six-view test no pixel of a view lies outside its rectangle and no gutter pixel inside one, with the same edge pixels on both backends. `TriStepClear` clears the whole bound target, not the viewport: clear before setting a view's rectangle. In a full-screen effect `SV_Position` is in target pixels, so subtract the viewport origin when a view's offscreen targets start at (0, 0) (`ViewRect` in the spike's `watercolour.fx`).
+(Bind it through `renderContext.GetEffectStateManager().SetRenderTarget(0, ...)` instead when an earlier step bound a target of another size: see "Render targets as a view's output, at any size".) A viewport set this way on the canvas is honoured to the pixel on WebGPU and WebGL2: in the six-view test no pixel of a view lies outside its rectangle and no gutter pixel inside one, with the same edge pixels on both backends. `TriStepClear` clears the whole bound target, not the viewport: clear before setting a view's rectangle. In a full-screen effect `SV_Position` is in target pixels, so subtract the viewport origin when a view's offscreen targets start at (0, 0) (`ViewRect` in the spike's `watercolour.fx`).
 
 ### Fork additions the game should use
 
@@ -101,6 +101,7 @@ A viewport set this way on the canvas is honoured to the pixel on WebGPU and Web
 | `LoadTexture`, `CreateTextureFromImage`, `UpdateTextureFromImage` | nothing: textures were not loadable before |
 | `UpdateTextureFromImage(t, src, { rect })`, `CreateTextureFromData`, `UpdateTextureFromData`, `LoadTexture(url, { maxSize })`, `ReleaseTexture` | whole-texture repaints; uniform arrays for data; oversized pictures |
 | `ReleaseGeometry(geometry)`, `GeometryPoolStats()` | dropping references, which frees nothing |
+| `ReleaseRenderTarget(target)` | `target.ReleaseResources()` with no argument, which does nothing |
 | `InstanceStream` | padding instance rows to keep the allocation |
 | `CurveLineSpans` | one ribbon mesh per clipped course |
 | `TimeJob(job)`, `TimeJobNow(job)`, `ShatteredBoot({ gpuTimer: true })` | submit-to-done times |
@@ -215,6 +216,26 @@ GeometryPoolStats();         // { allocations, bytes, blocks, blockBytes }, for 
 Proof (`requests.html`, `release`): 300 geometries drawn take 900 slices. `ReleaseGeometry` returns the count to where it started. The next 300 reuse the same block. 300 dropped without a release keep all 900 slices. The pool's blocks are never given back to the browser. A `Tr2Mesh` needs no release of its own.
 
 The engine's idle sweep (`TriDevice.CollectResources`, every 60 s, for resources unused for 30 s) does not touch these geometries, nor textures made here. It does release an idle `Tr2RenderTarget` or `Tr2DepthStencil` and its pixels. The next use brings it back after one device tick, so the first frame after a long pause draws into nothing. A host that keeps targets across screens it leaves for minutes should draw one frame, or check `IsValid()`, before relying on them.
+
+### Render targets as a view's output, at any size
+
+A view's last pass can draw into a `Tr2RenderTarget` instead of the canvas, and another effect can sample that target. This is the intended route, and it works on both backends:
+
+```js
+esm.SetRenderTarget(0, plate.GetRenderTarget()); esm.SetDepthStencilBuffer(null); esm.SetViewport({ x: 0, y: 0, width, height });
+// ... the pass ...
+sheet.SetParameter__TextureAL("SkyPlate", plate.GetRenderTarget());
+```
+
+Row 0 of a target is its top, so `v` runs down on both backends: the proof page's paper pass reads its scene target by pixel and the picture lands the same way up on WebGPU and WebGL2. Three rules, all found on the proof page (`halfResolution`):
+
+- **Bind targets, the canvas included, through the effect state manager** (`esm.SetRenderTarget(0, backend.GetCanvasTarget())`) whenever an earlier step bound a target of another size. `backend.al.SetRenderTarget` bypasses the manager, so it keeps the old target's extent. It then clips the next viewport to that extent and scales full-screen texture coordinates by it. On WebGPU the canvas showed a quarter of the picture. With same-size targets throughout, as before, either call works.
+- `SetFullScreenViewport()` is the bound target's size only when the manager bound it. Otherwise set the viewport explicitly.
+- `TriStepRenderEffect`'s texture coordinates are scaled to the manager's device viewport (`Tr2RenderUtils.adjustTextureCoordsToViewport`). A full-screen pass into a target smaller than the device should read its source by `SV_Position` (`effects/req/paper.fx`).
+
+**Half resolution with a filtered upsample** works with these calls: draw into half-size targets with their own viewport, then run a `TriStepRenderEffect` with our filtered blit (`effects/system/blitfiltered.fx`, `BlitSource`, `MIN_MAG_MIP_LINEAR`) onto the canvas, bound through the manager. On the proof page the flat regions match the full-resolution picture exactly on both backends; edges soften.
+
+**Releasing a target:** `ReleaseRenderTarget(target)` (also for a `Tr2DepthStencil`) destroys the device texture and the creation parameters, so nothing rebuilds it, and it leaves the device registry. `Create` makes it again. `target.ReleaseResources()` with no argument **does nothing**, because it takes a storage mask. With a mask it frees the texture but keeps the parameters, and the next use rebuilds it. Proof `targets`.
 
 ### Instance streams with a capacity
 
