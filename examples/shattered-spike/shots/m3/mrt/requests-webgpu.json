@@ -1,0 +1,74 @@
+[
+ {
+  "path": "index.html",
+  "bytes": 659
+ },
+ {
+  "path": "dist/spike.js",
+  "bytes": 1107921
+ },
+ {
+  "path": "dist/chunks/chunk-NFVII44O.js",
+  "bytes": 127773
+ },
+ {
+  "path": "dist/chunks/chunk-AANYYZAD.js",
+  "bytes": 19252
+ },
+ {
+  "path": "dist/chunks/chunk-XE3FN6U4.js",
+  "bytes": 57069
+ },
+ {
+  "path": "dist/chunks/chunk-XCLPUWMJ.js",
+  "bytes": 1363381
+ },
+ {
+  "path": "dist/chunks/chunk-YMDC7PZM.js",
+  "bytes": 413669
+ },
+ {
+  "path": "dist/chunks/chunk-KB7WVJHK.js",
+  "bytes": 5271
+ },
+ {
+  "path": "dist/chunks/CjsBrowserBackend-YQNMCO3J-QGEI56PT.js",
+  "bytes": 128090
+ },
+ {
+  "path": "dist/chunks/chunk-ZUWZGR3I.js",
+  "bytes": 1159
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/system/blit.sm_depth",
+  "bytes": 2842
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/system/blitfiltered.sm_depth",
+  "bytes": 2592
+ },
+ {
+  "path": "data/cruiser.json",
+  "bytes": 8768
+ },
+ {
+  "path": "data/cruiser.bin",
+  "bytes": 823440
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/hull.sm_depth",
+  "bytes": 7925
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/hullnormal.sm_depth",
+  "bytes": 4559
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/watercolour.sm_depth",
+  "bytes": 8749
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/hullmrt.sm_depth",
+  "bytes": 8359
+ }
+]

@@ -18,6 +18,8 @@
 //                the job and calls blue.os.PumpOS() per view. window.__spike.views reports job runs per frame.
 //   lateload=1   after a few frames, loads a PNG through resMan while only PumpLoading() is called, then
 //                stops drawing: the job must not run during the load and the canvas must keep its picture
+//   mrt=1        the wash and the normal/depth target written in one pass (two colour targets, effects/hullmrt.fx)
+//                instead of two passes over the same batches
 //   filter=point the backdrop point-sampled instead of trilinear; zoom=N scales its UVs (N > 1 minifies)
 import {
   blue, BlueScriptCallback, mat4, vec3, DepthStencilFormat, PixelFormat, ShaderType, TriBatchType,
@@ -46,6 +48,7 @@ const FILTER_POINT = params.get("filter") === "point";
 const ZOOM = Number(params.get("zoom") ?? 1);
 const VIEWS = Math.max(0, Number(params.get("views") ?? 0) | 0);
 const DRAW = params.get("draw") ?? "now";
+const MRT = params.get("mrt") === "1";
 const LATE_LOAD = params.get("lateload") === "1";
 // The colour the canvas is cleared to between views: any pixel of it left in a view, or missing from a gutter, is a viewport fault.
 const GUTTER = [ 0.2, 0.6, 0.4, 1 ];
@@ -266,6 +269,8 @@ async function Main()
     };
   }
 
+  const mrtEffect = MRT ? await LoadEffect("hullmrt") : null;
+
   const mesh = new Tr2Mesh();
   mesh.name = meta.hull;
   mesh.PySetGeometryRes(geometry);
@@ -359,6 +364,22 @@ async function Main()
   clearCanvas.color.set(GUTTER);
   clearCanvas.isColorCleared = clearCanvas.isDepthCleared = false;
 
+  // Our per-frame constants, from the view and projection the two steps before it set on the renderer.
+  const uploadFrameConstants = () =>
+  {
+    mat4.copy(viewMatrix, Tr2Renderer.GetViewTransform());
+    mat4.multiply(viewProjection, Tr2Renderer.GetProjectionTransform(), viewMatrix);
+    frameVS.SetAndTranspose("ViewProjectionMat", viewProjection);
+    frameVS.SetAndTranspose("ViewMat", viewMatrix);
+    const light = vec3.normalize(vec3.create(), [ -0.45, 0.7, 0.55 ]);
+    framePS.Set("LightDirection", [ light[0], light[1], light[2], 0 ]);
+    framePS.Set("Paper", [ 0.958, 0.938, 0.897, 1 ]);
+    framePS.Set("Paint", [ 0.85, 1, state.time, 0 ]);
+    const vs = frameVS.GetData(), ps = framePS.GetData();
+    Tr2RenderUtils.fillAndSetConstants(frameVSBuffer, vs, vs.byteLength, 1 << ShaderType.VERTEX_SHADER, PER_FRAME_VS, renderContext);
+    Tr2RenderUtils.fillAndSetConstants(framePSBuffer, ps, ps.byteLength, 1 << ShaderType.PIXEL_SHADER, PER_FRAME_PS, renderContext);
+  };
+
   const job = new TriRenderJob();
   job.name = "ShatteredSpike";
   for (const step of [
@@ -388,43 +409,49 @@ async function Main()
       }
       for (const ship of fleet.ships) ship.Update(state.time);
     }),
+    ...(MRT ? [
+      // One pass: the wash into colour target 0 and the normal and depth into colour target 1.
+      callback(() =>
+      {
+        esm().SetRenderTarget(0, colourTarget.GetRenderTarget());
+        esm().SetRenderTarget(1, normalTarget.GetRenderTarget());
+        esm().SetDepthStencilBuffer(depth.GetDepthStencil());
+        esm().SetFullScreenViewport();
+      }),
+      clear(),
+      callback(sceneViewport),
+      setView,
+      setProjection,
+      callback(uploadFrameConstants),
+      renderFleet(mrtEffect),
+      // Slot 1 is let go before anything else is bound: the next pass has one target.
+      callback(() => { esm().SetRenderTarget(1, null); })
+    ] : [
     // Pass 1: the body wash into the colour target.
-    callback(() =>
-    {
-      esm().SetRenderTarget(0, colourTarget.GetRenderTarget());
-      esm().SetDepthStencilBuffer(depth.GetDepthStencil());
-      esm().SetFullScreenViewport();
-    }),
-    clear(),
-    callback(sceneViewport),
-    setView,
-    setProjection,
-    // Our per-frame constants, from the view and projection the two steps above set on the renderer.
-    callback(() =>
-    {
-      mat4.copy(viewMatrix, Tr2Renderer.GetViewTransform());
-      mat4.multiply(viewProjection, Tr2Renderer.GetProjectionTransform(), viewMatrix);
-      frameVS.SetAndTranspose("ViewProjectionMat", viewProjection);
-      frameVS.SetAndTranspose("ViewMat", viewMatrix);
-      const light = vec3.normalize(vec3.create(), [ -0.45, 0.7, 0.55 ]);
-      framePS.Set("LightDirection", [ light[0], light[1], light[2], 0 ]);
-      framePS.Set("Paper", [ 0.958, 0.938, 0.897, 1 ]);
-      framePS.Set("Paint", [ 0.85, 1, state.time, 0 ]);
-      const vs = frameVS.GetData(), ps = framePS.GetData();
-      Tr2RenderUtils.fillAndSetConstants(frameVSBuffer, vs, vs.byteLength, 1 << ShaderType.VERTEX_SHADER, PER_FRAME_VS, renderContext);
-      Tr2RenderUtils.fillAndSetConstants(framePSBuffer, ps, ps.byteLength, 1 << ShaderType.PIXEL_SHADER, PER_FRAME_PS, renderContext);
-    }),
-    renderFleet(null),
-    // Pass 2: normals and depth, the same batches under an override material.
-    callback(() =>
-    {
-      esm().SetRenderTarget(0, normalTarget.GetRenderTarget());
-      esm().SetDepthStencilBuffer(depth.GetDepthStencil());
-      esm().SetFullScreenViewport();
-    }),
-    clear(),
-    callback(sceneViewport),
-    renderFleet(normalEffect),
+      callback(() =>
+      {
+        esm().SetRenderTarget(0, colourTarget.GetRenderTarget());
+        esm().SetDepthStencilBuffer(depth.GetDepthStencil());
+        esm().SetFullScreenViewport();
+      }),
+      clear(),
+      callback(sceneViewport),
+      setView,
+      setProjection,
+      // Our per-frame constants, from the view and projection the two steps above set on the renderer.
+      callback(uploadFrameConstants),
+      renderFleet(null),
+      // Pass 2: normals and depth, the same batches under an override material.
+      callback(() =>
+      {
+        esm().SetRenderTarget(0, normalTarget.GetRenderTarget());
+        esm().SetDepthStencilBuffer(depth.GetDepthStencil());
+        esm().SetFullScreenViewport();
+      }),
+      clear(),
+      callback(sceneViewport),
+      renderFleet(normalEffect),
+    ]),
     // Pass 3: onto the canvas. The backdrop first when asked for, then the watercolour pass over both targets.
     callback(() =>
     {

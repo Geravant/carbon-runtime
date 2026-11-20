@@ -1,0 +1,53 @@
+{
+ "gpu": "metal",
+ "results": [
+  {
+   "ships": 30,
+   "backend": "webgpu",
+   "adapter": "apple metal-3",
+   "firstFrameMs": 73.39999997615814,
+   "error": null,
+   "canvasRead": {
+    "width": 1280,
+    "height": 720,
+    "distinctColours": 8632,
+    "meanLuma": 210.61,
+    "darkShare": 0.1058,
+    "corner": [
+     220,
+     215,
+     206,
+     255
+    ],
+    "centre": [
+     39,
+     37,
+     52,
+     255
+    ]
+   },
+   "bench": {
+    "adapter": "apple metal-3",
+    "ships": 30,
+    "frames": 312,
+    "width": 1280,
+    "height": 720,
+    "interval": {
+     "mean": 16.666025641025637,
+     "median": 16.699999999999818,
+     "p95": 16.799999999999727
+    },
+    "cpu": {
+     "mean": 1.2823717968586164,
+     "median": 1.399999976158142,
+     "p95": 1.7000000476837158
+    },
+    "submitToDone": {
+     "mean": 4.051000003417333,
+     "median": 4.199999928474426,
+     "p95": 4.700000047683716
+    }
+   }
+  }
+ ]
+}

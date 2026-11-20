@@ -1,0 +1,53 @@
+{
+ "gpu": "metal",
+ "results": [
+  {
+   "ships": 30,
+   "backend": "webgl2",
+   "adapter": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+   "firstFrameMs": 105.70000004768372,
+   "error": null,
+   "canvasRead": {
+    "width": 1280,
+    "height": 720,
+    "distinctColours": 8677,
+    "meanLuma": 210.61,
+    "darkShare": 0.1058,
+    "corner": [
+     220,
+     215,
+     206,
+     255
+    ],
+    "centre": [
+     39,
+     37,
+     52,
+     255
+    ]
+   },
+   "bench": {
+    "adapter": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
+    "ships": 30,
+    "frames": 312,
+    "width": 1280,
+    "height": 720,
+    "interval": {
+     "mean": 16.66570512820513,
+     "median": 16.699999999999818,
+     "p95": 16.700000000000728
+    },
+    "cpu": {
+     "mean": 1.5022435864576926,
+     "median": 1.600000023841858,
+     "p95": 2
+    },
+    "submitToDone": {
+     "mean": 1.53399999777476,
+     "median": 1.600000023841858,
+     "p95": 2
+    }
+   }
+  }
+ ]
+}

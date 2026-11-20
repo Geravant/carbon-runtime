@@ -5,7 +5,7 @@
  },
  {
   "path": "dist/spike.js",
-  "bytes": 1104776
+  "bytes": 1107619
  },
  {
   "path": "dist/chunks/chunk-NFVII44O.js",
@@ -20,12 +20,12 @@
   "bytes": 57069
  },
  {
-  "path": "dist/chunks/chunk-YMDC7PZM.js",
-  "bytes": 413669
- },
- {
   "path": "dist/chunks/chunk-XCLPUWMJ.js",
   "bytes": 1363381
+ },
+ {
+  "path": "dist/chunks/chunk-YMDC7PZM.js",
+  "bytes": 413669
  },
  {
   "path": "dist/chunks/chunk-KB7WVJHK.js",
@@ -65,6 +65,6 @@
  },
  {
   "path": "res/graphics/effect.webgpu/shattered/watercolour.sm_depth",
-  "bytes": 8355
+  "bytes": 8749
  }
 ]

@@ -127,6 +127,26 @@ Filter (`MIN_MAG_MIP_LINEAR`, `MIN_MAG_MIP_POINT`) and addressing (`CLAMP`, `WRA
 
 The engine's own route works too: `blue.resMan.GetResource("res:/textures/marker.png")`, `await blue.resMan.Ready(resource)` (while `PumpOS` is being called), or a path in a `TriTextureParameter` / `effect.SetResourceTexture2D(name, path)`. `.png`, `.jpg` and `.jpeg` are registered. That route decodes with the engine's JS readers on the main thread and makes a texture with no mips, so use it for small images and `LoadTexture` for backdrops.
 
+### Several colour targets in one pass
+
+Works on both backends with no engine change. Bind the second target to slot 1, draw with an effect whose pixel shader returns a struct of `SV_Target0` and `SV_Target1`, and let slot 1 go afterwards:
+
+```js
+const esm = renderContext.GetEffectStateManager();
+esm.SetRenderTarget(0, colourTarget.GetRenderTarget());
+esm.SetRenderTarget(1, normalTarget.GetRenderTarget());
+esm.SetDepthStencilBuffer(depth.GetDepthStencil());
+// ... TriStepClear (clears every bound colour target and the depth), view, projection, draw ...
+esm.SetRenderTarget(1, null);          // before the next pass binds its own target
+```
+
+```hlsl
+struct HullTargets { float4 colour : SV_Target0; float4 normal : SV_Target1; };
+HullTargets HullMrtPS( HullVSOutput input ) { HullTargets output; /* ... */ return output; }
+```
+
+The spike page does this under `?mrt=1` (`effects/hullmrt.fx`): the picture is identical, pixel for pixel, to the two-pass one on WebGPU and on WebGL2, and the two backends' pictures are identical to each other (`shots/m3/mrt/`, compared with `tools/diff.mjs`). 30 ships: 31 draws a frame instead of 61. Both targets must be the same size; they may differ in format. The blend state of the pass applies to every target.
+
 ### Effects
 
 Effects are HLSL `.fx` files in the engine's effect syntax. The package carries the engine's own effect compiler as a command and as a function:
