@@ -1,0 +1,421 @@
+// Shattered Reach rendering spike: one of our own hulls drawn by the CarbonEngineJS
+// runtime's real draw path (render job -> render steps -> batches -> Tr2RenderContext
+// -> the WebGPU abstraction layer), with our own effects and our own full-screen
+// watercolour pass. No EVE content: the hull is data exported from the game, the
+// effects are ours (../effects/*.fx), and nothing else is loaded.
+//
+// URL parameters:
+//   ships=N      how many ships to draw (default 1; 30 for the fleet measurement)
+//   yaw=DEG      hold the camera at this yaw instead of orbiting
+//   elevation=DEG camera elevation above the ship's plane (default 12, the game's battle view)
+//   paint=0      skip the watercolour pass: the hull's colour target blitted as it is
+//   bench=N      measure N frames and put the result in window.__spike.bench
+import { CjsLibrary } from "../../../npm/dist/core/CjsLibrary.js";
+import { CjsBlueResFileSystemFetch } from "../../../npm/dist/blue/io/CjsBlueResFileSystemFetch.js";
+import { blue } from "../../../npm/dist/blue/index.js";
+import { BlueScriptCallback } from "../../../npm/dist/blue/index.js";
+import { mat4 } from "../../../npm/dist/global/math/mat4.js";
+import { vec3 } from "../../../npm/dist/global/math/vec3.js";
+import { PixelFormat } from "../../../npm/dist/global/consts/renderContext/formats.js";
+import { ShaderType } from "../../../npm/dist/global/consts/renderContext/pipeline.js";
+import { TR2SHADERMODEL, TriBatchType } from "../../../npm/dist/global/consts/graphics/trinityEnums.js";
+import { trinity } from "../../../npm/dist/trinity/CjsTrinity.js";
+import { Tr2Renderer, PER_FRAME_VS, PER_FRAME_PS } from "../../../npm/dist/trinity/core/Tr2Renderer.js";
+import { Tr2RenderUtils } from "../../../npm/dist/trinity/core/Tr2RenderUtils.js";
+import { Tr2RenderContext_GetMainThreadRenderContext } from "../../../npm/dist/trinity/core/context/Tr2RenderContext.js";
+import { Tr2RenderTarget } from "../../../npm/dist/trinity/core/device/Tr2RenderTarget.js";
+import { Tr2DepthStencil } from "../../../npm/dist/trinity/core/device/Tr2DepthStencil.js";
+import { Tr2Mesh } from "../../../npm/dist/trinity/core/mesh/Tr2Mesh.js";
+import { Tr2MeshArea } from "../../../npm/dist/trinity/core/mesh/Tr2MeshArea.js";
+import { ITr2Renderable } from "../../../npm/dist/trinity/core/ITr2Renderable.js";
+import { TriView } from "../../../npm/dist/trinity/core/view/TriView.js";
+import { TriProjection } from "../../../npm/dist/trinity/core/view/TriProjection.js";
+import { CjsConstantLayout } from "../../../npm/dist/trinity/core/rawData/CjsConstantLayout.js";
+import { RawData } from "../../../npm/dist/trinity/core/rawData/RawData.js";
+import { TriGeometryRes } from "../../../npm/dist/trinity/resources/geometry/TriGeometryRes.js";
+import { Tr2Effect } from "../../../npm/dist/trinity/shader/Tr2Effect.js";
+import { Tr2EffectStateManager } from "../../../npm/dist/trinity/shader/Tr2EffectStateManager.js";
+import { Tr2RenderJobs } from "../../../npm/dist/trinity/renderJob/Tr2RenderJobs.js";
+import { TriRenderJob } from "../../../npm/dist/trinity/renderJob/TriRenderJob.js";
+import { TriStepClear } from "../../../npm/dist/trinity/renderJob/step/TriStepClear.js";
+import { TriStepPythonCB } from "../../../npm/dist/trinity/renderJob/step/TriStepPythonCB.js";
+import { TriStepRenderEffect } from "../../../npm/dist/trinity/renderJob/step/TriStepRenderEffect.js";
+import { TriStepRenderObject } from "../../../npm/dist/trinity/renderJob/step/TriStepRenderObject.js";
+import { TriStepSetProjection } from "../../../npm/dist/trinity/renderJob/step/TriStepSetProjection.js";
+import { TriStepSetView } from "../../../npm/dist/trinity/renderJob/step/TriStepSetView.js";
+import { Tr2ConstantBufferAL } from "../../../npm/dist/trinityal/Tr2ConstantBufferAL/Tr2ConstantBufferAL.js";
+
+const T0 = performance.now();
+const params = new URLSearchParams(location.search);
+const SHIPS = Math.max(1, Number(params.get("ships") ?? 1) | 0);
+const HELD_YAW = params.has("yaw") ? Number(params.get("yaw")) * Math.PI / 180 : null;
+const ELEVATION = Number(params.get("elevation") ?? 12) * Math.PI / 180;
+const PAINT = params.get("paint") !== "0";
+const BENCH = Number(params.get("bench") ?? 0) | 0;
+const HULL = params.get("hull") ?? "cruiser";
+
+const spike = window.__spike = { ready: false, error: null, frames: 0, firstFrameMs: null, bench: null, diagnostics: [] };
+
+// ---------------------------------------------------------------------------------------------
+// Our own constant layouts, matching ../effects/ShatteredFrame.fxh. The engine's catalogs
+// (CjsPerObjectLayouts, CjsPerFrameLayouts) are closed lists of EVE structs, and RawData.create
+// only looks there; a RawData over a layout resolved here needs neither.
+const { Types, Identity } = CjsConstantLayout;
+const LAYOUTS = CjsConstantLayout.BuildLayouts({
+  ShatteredPerFrame: {
+    vs: { struct: "ShatteredPerFrameVSData", fields: {
+      ViewProjectionMat: { type: Types.MATRIX4, default: Identity },
+      ViewMat: { type: Types.MATRIX4, default: Identity }
+    } },
+    ps: { struct: "ShatteredPerFramePSData", fields: {
+      LightDirection: { type: Types.VECTOR4 },
+      Paper: { type: Types.VECTOR4 },
+      Paint: { type: Types.VECTOR4 }
+    } }
+  },
+  ShatteredObject: {
+    vs: { struct: "ShatteredObjectVSData", fields: {
+      worldTransform: { type: Types.MATRIX4, default: Identity }
+    } }
+  }
+}, "ShatteredLayouts");
+
+function CreateRawData(struct)
+{
+  const layout = CjsConstantLayout.ToRawLayout(LAYOUTS.get(struct));
+  const floats = new Float32Array(layout.stride);
+  for (const preset of layout.defaults) floats.set(preset.values, preset.offset);
+  return new RawData(layout, floats, new Uint32Array(floats.buffer), struct);
+}
+
+// ---------------------------------------------------------------------------------------------
+// The hull as an engine geometry resource, from plain data. The only geometry format the engine
+// routes is GR2; CMF is declared but unrouted. TriGeometryRes takes decoded CMF-shaped data
+// though (SetupMeshes__CmfData), which is how it is fed here, the way PrepareFromGrannyRes does.
+async function LoadHullGeometry(name)
+{
+  const [ meta, bytes ] = await Promise.all([
+    fetch(`./data/${name}.json`).then(response => response.json()),
+    fetch(`./data/${name}.bin`).then(response => response.arrayBuffer())
+  ]);
+  const floatsPerVertex = meta.vertex.stride / 4;
+  const interleaved = new Float32Array(bytes, meta.vertexByteOffset, meta.vertexCount * floatsPerVertex);
+  const indices = new Uint32Array(bytes, meta.indexByteOffset, meta.indexCount);
+
+  const channel = (offset, count) =>
+  {
+    const out = new Float32Array(meta.vertexCount * count);
+    for (let v = 0; v < meta.vertexCount; v++)
+      for (let c = 0; c < count; c++) out[v * count + c] = interleaved[v * floatsPerVertex + offset + c];
+    return out;
+  };
+
+  const payload = {
+    meshes: [ {
+      name: meta.hull,
+      decl: [
+        { usage: "Position", usageIndex: 0, type: "Float32", elementCount: 3, offset: 0 },
+        { usage: "Normal", usageIndex: 0, type: "Float32", elementCount: 3, offset: 12 },
+        { usage: "Color", usageIndex: 0, type: "Float32", elementCount: 3, offset: 24 },
+        { usage: "TexCoord", usageIndex: 0, type: "Float32", elementCount: 1, offset: 36 },
+        { usage: "TexCoord", usageIndex: 1, type: "Float32", elementCount: 2, offset: 40 }
+      ],
+      vertex: {
+        position: channel(0, 3), normal: channel(3, 3), color0: channel(6, 3),
+        texcoord0: channel(9, 1), texcoord1: channel(10, 2)
+      },
+      vertexCount: meta.vertexCount,
+      indexBuffer: indices,
+      areas: [ { name: "hull", firstElement: 0, elementCount: meta.indexCount / 3 } ],
+      bounds: meta.bounds,
+      boundingSphere: [ 0, 0, 0, meta.radius ]
+    } ]
+  };
+
+  const geometry = new TriGeometryRes();
+  geometry.SetupMeshes__CmfData(payload);
+  geometry.SetupSkeletons__CmfData(payload);
+  geometry._useCMF = true;
+  geometry._isPrepared = geometry._isGood = true;
+  return { geometry, meta };
+}
+
+// ---------------------------------------------------------------------------------------------
+// One ship: a transform and its own per-object constants over the shared mesh.
+class ShatteredShip
+{
+  transform = mat4.create();
+  home = vec3.create();
+  phase = 0;
+  objectData = { vs: CreateRawData("ShatteredObjectVSData") };
+
+  Update(time)
+  {
+    mat4.fromTranslation(this.transform, this.home);
+    // A slow roll and bob, so thirty ships are not thirty copies of one pose.
+    mat4.rotateY(this.transform, this.transform, this.phase);
+    mat4.rotateX(this.transform, this.transform, Math.sin(time * 0.7 + this.phase) * 0.12);
+    this.objectData.vs.SetAndTranspose("worldTransform", this.transform);
+  }
+}
+
+// The fleet as one Trinity renderable: the render step asks it for batches, and it commits one
+// batch a ship through the mesh's own batch builder (Tr2MeshBase.GetBatches).
+class ShatteredFleet extends ITr2Renderable
+{
+  mesh = null;
+  ships = [];
+
+  GetPerObjectData(_accumulator)
+  {
+    return null;
+  }
+
+  GetBatches(accumulator, batchType, _perObjectData, _reason)
+  {
+    if (batchType !== TriBatchType.TRIBATCHTYPE_OPAQUE) return false;
+    let committed = false;
+    for (const ship of this.ships) committed = this.mesh.GetBatches(accumulator, batchType, ship.objectData) || committed;
+    return committed;
+  }
+
+  HasTransparentBatches()
+  {
+    return false;
+  }
+
+  GetSortValue()
+  {
+    return 0;
+  }
+}
+
+async function LoadEffect(name)
+{
+  const effect = new Tr2Effect();
+  effect.effectFilePath = `res:/graphics/effect/shattered/${name}.fx`;
+  effect.Initialize();
+  await blue.resMan.Ready(effect.effectResource);
+  effect.RebuildCachedData();
+  Tr2EffectStateManager.registerShaderHandles(effect.shader);
+  if (!effect.IsGood()) throw new Error(`effect ${name} is not good after load`);
+  return effect;
+}
+
+async function Main()
+{
+  const canvas = document.getElementById("view");
+  const ratio = Number(params.get("ratio") ?? globalThis.devicePixelRatio ?? 1);
+  canvas.width = Math.max(1, Math.round(canvas.clientWidth * ratio));
+  canvas.height = Math.max(1, Math.round(canvas.clientHeight * ratio));
+
+  // Our own effect tree is already WebGPU: source and target are the same, so no translator.
+  const library = new CjsLibrary({ effects: { source: "webgpu", target: "webgpu", translator: null, shaderModel: "depth" } });
+  const backend = await library.AcquireBackend({ canvas, preference: [ "webgpu" ], shaderModel: "depth" });
+  library.SetConfiguration({ paths: { shattered: new CjsBlueResFileSystemFetch({ paths: { res: new URL("./res/", location.href).href } }) } });
+  await library.Initialize({});
+  const device = library.AttachTrinity({ renderContextAL: backend.al, backend: backend.name });
+  Tr2Renderer.SetShaderModel(TR2SHADERMODEL.TR2SM_3_0_DEPTH);
+  device.width = canvas.width;
+  device.height = canvas.height;
+  spike.backend = backend.name;
+
+  const renderContext = Tr2RenderContext_GetMainThreadRenderContext();
+
+  const [ { geometry, meta }, hullEffect, normalEffect, paintEffect ] = await Promise.all([
+    LoadHullGeometry(HULL), LoadEffect("hull"), LoadEffect("hullnormal"), LoadEffect("watercolour")
+  ]);
+
+  const mesh = new Tr2Mesh();
+  mesh.name = meta.hull;
+  mesh.PySetGeometryRes(geometry);
+  const area = new Tr2MeshArea();
+  area.name = "hull";
+  area.SetMaterial(hullEffect);
+  area.SetIndex(0);
+  area.SetCount(1);
+  mesh.AddArea(TriBatchType.TRIBATCHTYPE_OPAQUE, area);
+
+  const fleet = new ShatteredFleet();
+  fleet.mesh = mesh;
+  const columns = Math.ceil(Math.sqrt(SHIPS * 1.6));
+  const rows = Math.ceil(SHIPS / columns);
+  const spacingX = meta.length * 1.25, spacingZ = meta.length * 0.8;
+  for (let i = 0; i < SHIPS; i++)
+  {
+    const ship = new ShatteredShip();
+    const column = i % columns, row = Math.floor(i / columns);
+    vec3.set(ship.home, (column - (columns - 1) / 2) * spacingX, 0, (row - (rows - 1) / 2) * spacingZ);
+    ship.phase = SHIPS === 1 ? 0 : i * 0.9;
+    fleet.ships.push(ship);
+  }
+  const extent = SHIPS === 1 ? meta.radius * 1.15 : Math.hypot(columns * spacingX, rows * spacingZ) * 0.5 + meta.radius * 0.3;
+
+  // The scene's targets: colour (rgb the wash, a the hull's coverage), normal (rgb view normal,
+  // a depth) and a depth buffer, all the canvas's size.
+  const colourTarget = new Tr2RenderTarget();
+  const normalTarget = new Tr2RenderTarget();
+  const depth = new Tr2DepthStencil();
+  const CreateTargets = () =>
+  {
+    colourTarget.Create(canvas.width, canvas.height, 1, PixelFormat.PIXEL_FORMAT_R16G16B16A16_FLOAT);
+    normalTarget.Create(canvas.width, canvas.height, 1, PixelFormat.PIXEL_FORMAT_R16G16B16A16_FLOAT);
+    depth.Create(canvas.width, canvas.height, PixelFormat.PIXEL_FORMAT_D32_FLOAT, 1, 0, 0, renderContext);
+    if (!colourTarget.IsValid() || !normalTarget.IsValid() || !depth.IsValid()) throw new Error("the scene targets could not be created");
+  };
+  CreateTargets();
+
+  const view = new TriView();
+  const projection = new TriProjection();
+  const frameVS = CreateRawData("ShatteredPerFrameVSData");
+  const framePS = CreateRawData("ShatteredPerFramePSData");
+  const frameVSBuffer = new Tr2ConstantBufferAL();
+  const framePSBuffer = new Tr2ConstantBufferAL();
+  const viewProjection = mat4.create();
+  const viewMatrix = mat4.create();
+  const eye = vec3.create();
+  const state = { time: 0, yaw: HELD_YAW ?? 0 };
+
+  const esm = () => renderContext.GetEffectStateManager();
+  const callback = fn =>
+  {
+    const step = new TriStepPythonCB();
+    step.callback = BlueScriptCallback.from(fn);
+    return step;
+  };
+  const clear = () =>
+  {
+    const step = new TriStepClear();
+    step.color.set([ 0, 0, 0, 0 ]);
+    step.depth = 1;
+    step.isColorCleared = true;
+    step.isDepthCleared = true;
+    return step;
+  };
+  const renderFleet = override =>
+  {
+    const step = new TriStepRenderObject();
+    step.renderable = fleet;
+    step.effectOverride = override;
+    step.renderDecal = step.renderTransparent = step.renderAdditive = false;
+    return step;
+  };
+  const setView = new TriStepSetView();
+  setView.view = view;
+  const setProjection = new TriStepSetProjection();
+  setProjection.projection = projection;
+  const paint = new TriStepRenderEffect();
+  paint.effect = paintEffect;
+
+  const job = new TriRenderJob();
+  job.name = "ShatteredSpike";
+  for (const step of [
+    // Update: the camera, the ships.
+    callback(() =>
+    {
+      const aspect = canvas.width / canvas.height;
+      const height = Math.max(extent * 2, extent * 2 / aspect);
+      const distance = extent * 4;
+      vec3.set(eye, Math.sin(state.yaw) * Math.cos(ELEVATION), Math.sin(ELEVATION), Math.cos(state.yaw) * Math.cos(ELEVATION));
+      vec3.scale(eye, eye, distance);
+      view.SetLookAtPosition(eye, [ 0, 0, 0 ], [ 0, 1, 0 ]);
+      projection.PerspectiveOrthographic(height * aspect, height, 0.1, distance * 2);
+      for (const ship of fleet.ships) ship.Update(state.time);
+    }),
+    // Pass 1: the body wash into the colour target.
+    callback(() =>
+    {
+      esm().SetRenderTarget(0, colourTarget.GetRenderTarget());
+      esm().SetDepthStencilBuffer(depth.GetDepthStencil());
+      esm().SetFullScreenViewport();
+    }),
+    clear(),
+    setView,
+    setProjection,
+    // Our per-frame constants, from the view and projection the two steps above set on the renderer.
+    callback(() =>
+    {
+      mat4.copy(viewMatrix, Tr2Renderer.GetViewTransform());
+      mat4.multiply(viewProjection, Tr2Renderer.GetProjectionTransform(), viewMatrix);
+      frameVS.SetAndTranspose("ViewProjectionMat", viewProjection);
+      frameVS.SetAndTranspose("ViewMat", viewMatrix);
+      const light = vec3.normalize(vec3.create(), [ -0.45, 0.7, 0.55 ]);
+      framePS.Set("LightDirection", [ light[0], light[1], light[2], 0 ]);
+      framePS.Set("Paper", [ 0.958, 0.938, 0.897, 1 ]);
+      framePS.Set("Paint", [ 0.85, 1, state.time, 0 ]);
+      const vs = frameVS.GetData(), ps = framePS.GetData();
+      Tr2RenderUtils.fillAndSetConstants(frameVSBuffer, vs, vs.byteLength, 1 << ShaderType.VERTEX_SHADER, PER_FRAME_VS, renderContext);
+      Tr2RenderUtils.fillAndSetConstants(framePSBuffer, ps, ps.byteLength, 1 << ShaderType.PIXEL_SHADER, PER_FRAME_PS, renderContext);
+    }),
+    renderFleet(null),
+    // Pass 2: normals and depth, the same batches under an override material.
+    callback(() =>
+    {
+      esm().SetRenderTarget(0, normalTarget.GetRenderTarget());
+      esm().SetDepthStencilBuffer(depth.GetDepthStencil());
+      esm().SetFullScreenViewport();
+    }),
+    clear(),
+    renderFleet(normalEffect),
+    // Pass 3: the watercolour pass over both, onto the canvas.
+    callback(() =>
+    {
+      backend.al.SetRenderTarget(0, backend.renderTarget);
+      backend.al.SetDepthStencil(null);
+      esm().SetFullScreenViewport();
+      paintEffect.SetParameter__TextureAL("SceneColour", colourTarget.GetRenderTarget());
+      paintEffect.SetParameter__TextureAL("SceneNormal", normalTarget.GetRenderTarget());
+    }),
+    paint
+  ]) job.steps.push(step);
+
+  const jobs = device.GetRenderJobs() ?? new Tr2RenderJobs();
+  jobs.recurring.push(job);
+  device.SetRenderJobs(jobs);
+
+  // The frame loop: Blue's tick runs Trinity, which runs the device's render jobs.
+  const frameTimes = [];
+  let last = performance.now();
+  const tick = now =>
+  {
+    requestAnimationFrame(tick);
+    const dt = (now - last) / 1000;
+    last = now;
+    state.time += dt;
+    if (HELD_YAW === null) state.yaw += dt * 0.5;
+    const before = performance.now();
+    blue.os.PumpOS();
+    const cpu = performance.now() - before;
+    spike.frames++;
+    if (spike.firstFrameMs === null) spike.firstFrameMs = performance.now() - T0;
+    if (BENCH && spike.frames > 20 && !spike.bench)
+    {
+      frameTimes.push({ interval: dt * 1000, cpu });
+      if (frameTimes.length >= BENCH)
+      {
+        const sorted = key => frameTimes.map(entry => entry[key]).sort((a, b) => a - b);
+        const summary = key =>
+        {
+          const values = sorted(key);
+          return { mean: values.reduce((sum, value) => sum + value, 0) / values.length, median: values[values.length >> 1], p95: values[Math.floor(values.length * 0.95)] };
+        };
+        spike.bench = { ships: SHIPS, frames: frameTimes.length, width: canvas.width, height: canvas.height, interval: summary("interval"), cpu: summary("cpu") };
+      }
+    }
+    spike.diagnostics = renderContext.GetDiagnostics?.() ?? [];
+  };
+  requestAnimationFrame(tick);
+
+  Object.assign(spike, {
+    ready: true, state, canvas, job, renderContext, backend, meta,
+    setYaw(degrees) { state.yaw = degrees * Math.PI / 180; },
+    status: () => job.status
+  });
+}
+
+Main().catch(error =>
+{
+  spike.error = String(error?.stack ?? error);
+  console.error("spike failed", error);
+  document.getElementById("status").textContent = spike.error;
+});
