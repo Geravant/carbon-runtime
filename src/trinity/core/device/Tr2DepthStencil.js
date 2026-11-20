@@ -110,8 +110,12 @@ export class Tr2DepthStencil extends IRoot
     if ((flags & ExFlag.EX_CREATE_SHARED) !== 0) gpuUsage |= Tr2GpuUsage.SHARED;
 
     const msaa = new Tr2MsaaDesc(msaaType, msaaQuality);
+    // @cjs Ours (Shattered Reach fork): a format with no depth pixel format (a PixelFormat passed by
+    // mistake, an unknown value) used to give an invalid surface with no message.
+    const pixelFormat = ConvertDepthStencilFormat(format);
+    if (pixelFormat === 0) throw new RangeError(`Tr2DepthStencil.Create: ${format} is not a DepthStencilFormat a backend can create (pass DepthStencilFormat.DSFMT_*, not a PixelFormat).`);
     const texture = renderContext?.CreateTexture(
-      Tr2BitmapDimensions.create__WidthHeightMipCountFormat(width, height, 1, ConvertDepthStencilFormat(format)),
+      Tr2BitmapDimensions.create__WidthHeightMipCountFormat(width, height, 1, pixelFormat),
       { gpuUsage, msaa }
     );
 

@@ -143,10 +143,21 @@ export class Tr2Blitter
     Tr2VariableStore.globalStore().RegisterVariableInternal(BLIT_SOURCE, TriVariableContentType.TRIVARIABLE_TEXTURE_RES, this._textureReference);
 
     this._blitEffect = new Tr2Effect();
-    this._blitEffect.SetEffectPathName(BLIT_EFFECT_PATH);
+    this._blitEffect.SetEffectPathName(Tr2Blitter.blitEffectPath);
     this._blitFilteredEffect = new Tr2Effect();
-    this._blitFilteredEffect.SetEffectPathName(BLIT_FILTERED_EFFECT_PATH);
+    this._blitFilteredEffect.SetEffectPathName(Tr2Blitter.blitFilteredEffectPath);
   }
+
+  /**
+   * The paths the two blit effects are created from. Carbon's by default; a host with its own
+   * effect tree names its own files here before the first blitter is constructed (the renderer
+   * makes one at Trinity start-up).
+   *
+   * @cjs Ours (Shattered Reach fork); Carbon's paths are compile-time constants (Tr2Blitter.cpp:11-12).
+   */
+  static blitEffectPath = BLIT_EFFECT_PATH;
+
+  static blitFilteredEffectPath = BLIT_FILTERED_EFFECT_PATH;
 
   /**
    * Replaces the two blit materials; tests stand fakes in with it.

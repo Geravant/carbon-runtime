@@ -8,12 +8,9 @@
 // webgl2/webgl2Host.js), without its diagnostics, so Tny and Graphene start the
 // same way. Carbon has no browser backend selection; this is our extension.
 import { Failed } from "../../trinityal/ALResult.js";
-import { Tr2RenderContextALWebgl2 } from "../../trinityal/webgl2/Tr2RenderContextALWebgl2.js";
 import { CjsWebgpuDevice } from "../../trinityal/webgpu/CjsWebgpuDevice.js";
 import { CjsWebgpuRenderContextAL } from "../../trinityal/webgpu/CjsWebgpuRenderContextAL.js";
 import { CjsWebgpuRenderTarget } from "../../trinityal/webgpu/core/CjsWebgpuRenderTarget.js";
-import { CjsWebgpuFormat } from "../../resource/formats/webgpu/CjsWebgpuFormat.js";
-import { CjsWebglFormat } from "../../resource/formats/webgl/CjsWebglFormat.js";
 import { Tr2RenderTarget } from "../../trinity/core/device/Tr2RenderTarget.js";
 import { Tr2StepExecuteRenderNode } from "../../trinity/renderJob/step/Tr2StepExecuteRenderNode.js";
 import { Tr2PlatformInfo } from "./Tr2PlatformInfo.js";
@@ -22,17 +19,25 @@ import { Tr2PlatformInfo } from "./Tr2PlatformInfo.js";
 export const CjsBrowserBackendPreference = Object.freeze([ "webgpu", "webgl2" ]);
 
 /**
- * Dx11 effects lowered to GLSL with packed lights and the sixteen texture units
- * WebGL2 guarantees each stage.
+ * The dx11 effect translator for a backend, imported when a backend that wants one is acquired.
+ * WebGL2's lowers to GLSL with packed lights and the sixteen texture units WebGL2 guarantees each stage.
+ *
+ * @cjs Ours (Shattered Reach fork): the translators and the WebGL2 layer were static imports,
+ *   so every bundle carried both; a host with its own effect tree needs neither translator.
  */
-const webgl2Translator = {
-  buildEffect(bytes, options)
-  {
-    return CjsWebglFormat.buildEffect(bytes, { ...options,
-      localLights: "packed-texture", textureUnitBudget: 16,
-      emitterOptions: { lightPackedTexture: { dataTexelBase: 2097152 }, packedLightProfiles: false, depthRange: "forward", clipYFlip: true } });
-  }
-};
+async function LoadTranslator(name)
+{
+  if (name === "webgpu") return (await import("../../resource/formats/webgpu/CjsWebgpuFormat.js")).CjsWebgpuFormat;
+  const { CjsWebglFormat } = await import("../../resource/formats/webgl/CjsWebglFormat.js");
+  return {
+    buildEffect(bytes, options)
+    {
+      return CjsWebglFormat.buildEffect(bytes, { ...options,
+        localLights: "packed-texture", textureUnitBudget: 16,
+        emitterOptions: { lightPackedTexture: { dataTexelBase: 2097152 }, packedLightProfiles: false, depthRange: "forward", clipYFlip: true } });
+    }
+  };
+}
 
 /**
  * One acquired device backend on one canvas: its abstraction layer, the canvas
@@ -66,6 +71,9 @@ export class CjsBrowserBackend
   /** Set by Destroy. */
   _destroyed = false;
 
+  /** The dx11 effect translator for this backend; null when created with `translator: false`. */
+  _translator = null;
+
   /**
    * Acquires the first backend in `preference` the browser can provide.
    * Each WebGPU attempt acquires its device before it touches the canvas, so a
@@ -77,26 +85,38 @@ export class CjsBrowserBackend
    * @param {string[]} [options.preference] Backends to try, in order.
    * @param {"opaque"|"premultiplied"} [options.alphaMode="opaque"] Canvas compositing.
    * @param {object} [options.webgpuDevice] A device request replacing the default one.
+   * @param {boolean} [options.translator=true] Whether to load the dx11 effect translator for the
+   *   acquired backend. False for a host whose effects are already compiled for the backend:
+   *   GetEffectConfiguration then names the backend's own tree with no translator.
    * @returns {Promise<CjsBrowserBackend>} The acquired backend.
    * @throws {AggregateError} When no backend could be acquired, with each reason.
    */
-  static async create({ canvas, preference = CjsBrowserBackendPreference, alphaMode = "opaque", webgpuDevice = null } = {})
+  static async create({ canvas, preference = CjsBrowserBackendPreference, alphaMode = "opaque", webgpuDevice = null, translator = true } = {})
   {
     if (!canvas) throw new TypeError("CjsBrowserBackend requires a canvas.");
 
     const reasons = [];
+    const finish = async backend =>
+    {
+      if (translator) backend._translator = await LoadTranslator(backend.name);
+      return backend;
+    };
 
     for (const name of preference)
     {
       if (name === "webgpu")
       {
         const device = await RequestWebgpuDevice(webgpuDevice).catch(error => { reasons.push(error); return null; });
-        if (device) return CjsBrowserBackend._createWebgpu(canvas, device, alphaMode);
+        if (device) return finish(CjsBrowserBackend._createWebgpu(canvas, device, alphaMode));
       }
       else if (name === "webgl2")
       {
         const gl = canvas.getContext("webgl2", { alpha: alphaMode !== "opaque", antialias: false, depth: false, stencil: false });
-        if (gl) return CjsBrowserBackend._createWebgl2(canvas, gl);
+        if (gl)
+        {
+          const { Tr2RenderContextALWebgl2 } = await import("../../trinityal/webgl2/Tr2RenderContextALWebgl2.js");
+          return finish(CjsBrowserBackend._createWebgl2(canvas, gl, Tr2RenderContextALWebgl2));
+        }
         reasons.push(new Error("WebGL2 unavailable"));
       }
       else throw new RangeError(`Unknown backend ${JSON.stringify(name)}; expected webgpu or webgl2.`);
@@ -127,7 +147,7 @@ export class CjsBrowserBackend
   }
 
   /** Composes WebGL2 on the canvas's context; its AL owns the default back buffer. */
-  static _createWebgl2(canvas, gl)
+  static _createWebgl2(canvas, gl, Tr2RenderContextALWebgl2)
   {
     if (!gl.getExtension("EXT_color_buffer_float")) throw new Error("Content HDR targets require EXT_color_buffer_float");
     gl.getExtension("OES_texture_float_linear");
@@ -156,9 +176,11 @@ export class CjsBrowserBackend
    */
   GetEffectConfiguration(shaderModel = "depth")
   {
+    const target = this.name === "webgpu" ? "webgpu" : "webgl";
+    if (!this._translator) return { source: target, target, translator: null, shaderModel };
     return this.name === "webgpu"
-      ? { source: "dx11", target: "webgpu", translator: CjsWebgpuFormat, shaderModel }
-      : { source: "dx11", target: "webgl", translator: webgl2Translator, shaderModel, permutations: "onDemand" };
+      ? { source: "dx11", target: "webgpu", translator: this._translator, shaderModel }
+      : { source: "dx11", target: "webgl", translator: this._translator, shaderModel, permutations: "onDemand" };
   }
 
   /**

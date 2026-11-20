@@ -10,40 +10,14 @@
 //   elevation=DEG camera elevation above the ship's plane (default 12, the game's battle view)
 //   paint=0      skip the watercolour pass: the hull's colour target blitted as it is
 //   bench=N      measure N frames and put the result in window.__spike.bench
-import { CjsLibrary } from "../../../npm/dist/core/CjsLibrary.js";
-import { CjsBlueResFileSystemFetch } from "../../../npm/dist/blue/io/CjsBlueResFileSystemFetch.js";
-import { blue } from "../../../npm/dist/blue/index.js";
-import { BlueScriptCallback } from "../../../npm/dist/blue/index.js";
-import { mat4 } from "../../../npm/dist/global/math/mat4.js";
-import { vec3 } from "../../../npm/dist/global/math/vec3.js";
-import { DepthStencilFormat, PixelFormat } from "../../../npm/dist/global/consts/renderContext/formats.js";
-import { ShaderType } from "../../../npm/dist/global/consts/renderContext/pipeline.js";
-import { TR2SHADERMODEL, TriBatchType } from "../../../npm/dist/global/consts/graphics/trinityEnums.js";
-import { trinity } from "../../../npm/dist/trinity/CjsTrinity.js";
-import { Tr2Renderer, PER_FRAME_VS, PER_FRAME_PS } from "../../../npm/dist/trinity/core/Tr2Renderer.js";
-import { Tr2RenderUtils } from "../../../npm/dist/trinity/core/Tr2RenderUtils.js";
-import { Tr2RenderContext_GetMainThreadRenderContext } from "../../../npm/dist/trinity/core/context/Tr2RenderContext.js";
-import { Tr2RenderTarget } from "../../../npm/dist/trinity/core/device/Tr2RenderTarget.js";
-import { Tr2DepthStencil } from "../../../npm/dist/trinity/core/device/Tr2DepthStencil.js";
-import { Tr2Mesh } from "../../../npm/dist/trinity/core/mesh/Tr2Mesh.js";
-import { Tr2MeshArea } from "../../../npm/dist/trinity/core/mesh/Tr2MeshArea.js";
-import { ITr2Renderable } from "../../../npm/dist/trinity/core/ITr2Renderable.js";
-import { TriView } from "../../../npm/dist/trinity/core/view/TriView.js";
-import { TriProjection } from "../../../npm/dist/trinity/core/view/TriProjection.js";
-import { CjsConstantLayout } from "../../../npm/dist/trinity/core/rawData/CjsConstantLayout.js";
-import { RawData } from "../../../npm/dist/trinity/core/rawData/RawData.js";
-import { TriGeometryRes } from "../../../npm/dist/trinity/resources/geometry/TriGeometryRes.js";
-import { Tr2Effect } from "../../../npm/dist/trinity/shader/Tr2Effect.js";
-import { Tr2EffectStateManager } from "../../../npm/dist/trinity/shader/Tr2EffectStateManager.js";
-import { Tr2RenderJobs } from "../../../npm/dist/trinity/renderJob/Tr2RenderJobs.js";
-import { TriRenderJob } from "../../../npm/dist/trinity/renderJob/TriRenderJob.js";
-import { TriStepClear } from "../../../npm/dist/trinity/renderJob/step/TriStepClear.js";
-import { TriStepPythonCB } from "../../../npm/dist/trinity/renderJob/step/TriStepPythonCB.js";
-import { TriStepRenderEffect } from "../../../npm/dist/trinity/renderJob/step/TriStepRenderEffect.js";
-import { TriStepRenderObject } from "../../../npm/dist/trinity/renderJob/step/TriStepRenderObject.js";
-import { TriStepSetProjection } from "../../../npm/dist/trinity/renderJob/step/TriStepSetProjection.js";
-import { TriStepSetView } from "../../../npm/dist/trinity/renderJob/step/TriStepSetView.js";
-import { Tr2ConstantBufferAL } from "../../../npm/dist/trinityal/Tr2ConstantBufferAL/Tr2ConstantBufferAL.js";
+//   backend=webgl2  ask for the WebGL2 backend only (default: WebGPU, then WebGL2)
+import {
+  blue, BlueScriptCallback, mat4, vec3, DepthStencilFormat, PixelFormat, ShaderType, TriBatchType,
+  Tr2Renderer, PER_FRAME_VS, PER_FRAME_PS, Tr2RenderUtils, Tr2RenderTarget, Tr2DepthStencil, Tr2Mesh, Tr2MeshArea,
+  ITr2Renderable, TriView, TriProjection, RawData, CjsConstantLayout, TriGeometryRes, Tr2Effect, Tr2EffectStateManager,
+  Tr2RenderJobs, TriRenderJob, TriStepClear, TriStepPythonCB, TriStepRenderEffect, TriStepRenderObject,
+  TriStepSetProjection, TriStepSetView, Tr2ConstantBufferAL, ShatteredBoot
+} from "@geravant/carbon-runtime-slim";
 
 const T0 = performance.now();
 const params = new URLSearchParams(location.search);
@@ -57,15 +31,15 @@ const HULL = params.get("hull") ?? "cruiser";
 const CAMERA = params.get("camera") ?? "ortho";
 // hold=1: time only moves through window.__spike.setTime, for frame sequences.
 const HOLD = params.get("hold") === "1";
+const BACKEND = params.get("backend");
 
 const spike = window.__spike = { ready: false, error: null, frames: 0, firstFrameMs: null, bench: null, diagnostics: [] };
 
 // ---------------------------------------------------------------------------------------------
-// Our own constant layouts, matching ../effects/ShatteredFrame.fxh. The engine's catalogs
-// (CjsPerObjectLayouts, CjsPerFrameLayouts) are closed lists of EVE structs, and RawData.create
-// only looks there; a RawData over a layout resolved here needs neither.
+// Our own constant layouts, matching ../effects/ShatteredFrame.fxh, registered beside the
+// engine's catalogs so RawData.create finds them by struct name.
 const { Types, Identity } = CjsConstantLayout;
-const LAYOUTS = CjsConstantLayout.BuildLayouts({
+RawData.RegisterLayouts({
   ShatteredPerFrame: {
     vs: { struct: "ShatteredPerFrameVSData", fields: {
       ViewProjectionMat: { type: Types.MATRIX4, default: Identity },
@@ -84,18 +58,10 @@ const LAYOUTS = CjsConstantLayout.BuildLayouts({
   }
 }, "ShatteredLayouts");
 
-function CreateRawData(struct)
-{
-  const layout = CjsConstantLayout.ToRawLayout(LAYOUTS.get(struct));
-  const floats = new Float32Array(layout.stride);
-  for (const preset of layout.defaults) floats.set(preset.values, preset.offset);
-  return new RawData(layout, floats, new Uint32Array(floats.buffer), struct);
-}
-
 // ---------------------------------------------------------------------------------------------
 // The hull as an engine geometry resource, from plain data. The only geometry format the engine
 // routes is GR2; CMF is declared but unrouted. TriGeometryRes takes decoded CMF-shaped data
-// though (SetupMeshes__CmfData), which is how it is fed here, the way PrepareFromGrannyRes does.
+// though, through PrepareFromCmfData (the fork's public entry).
 async function LoadHullGeometry(name)
 {
   const [ meta, bytes ] = await Promise.all([
@@ -137,10 +103,7 @@ async function LoadHullGeometry(name)
   };
 
   const geometry = new TriGeometryRes();
-  geometry.SetupMeshes__CmfData(payload);
-  geometry.SetupSkeletons__CmfData(payload);
-  geometry._useCMF = true;
-  geometry._isPrepared = geometry._isGood = true;
+  if (!geometry.PrepareFromCmfData(payload)) throw new Error("the hull geometry was refused");
   return { geometry, meta };
 }
 
@@ -151,7 +114,7 @@ class ShatteredShip
   transform = mat4.create();
   home = vec3.create();
   phase = 0;
-  objectData = { vs: CreateRawData("ShatteredObjectVSData") };
+  objectData = { vs: RawData.create("ShatteredObjectVSData") };
 
   Update(time)
   {
@@ -213,23 +176,27 @@ async function Main()
   canvas.width = Math.max(1, Math.round(canvas.clientWidth * ratio));
   canvas.height = Math.max(1, Math.round(canvas.clientHeight * ratio));
 
-  // Our own effect tree is already WebGPU: source and target are the same, so no translator.
-  // No callback workers: the page ships one script (the default worker entry is a separate module).
-  const library = new CjsLibrary({
-    effects: { source: "webgpu", target: "webgpu", translator: null, shaderModel: "depth" },
-    callbackMan: { useWorkers: false }
+  // Our own effect trees are already compiled for each backend, so no translator; the two effects
+  // the engine itself creates (the blitter's) are named as our own files.
+  const { backend, device, renderContext, effectTarget } = await ShatteredBoot({
+    canvas,
+    res: new URL("./res/", location.href),
+    preference: BACKEND ? [ BACKEND ] : [ "webgpu", "webgl2" ],
+    effectPaths: { blit: "res:/graphics/effect/shattered/system/blit.fx", blitFiltered: "res:/graphics/effect/shattered/system/blitfiltered.fx" }
   });
-  const backend = await library.AcquireBackend({ canvas, preference: [ "webgpu" ], shaderModel: "depth" });
-  library.SetConfiguration({ paths: { shattered: new CjsBlueResFileSystemFetch({ paths: { res: new URL("./res/", location.href).href } }) } });
-  await library.Initialize({});
-  const device = library.AttachTrinity({ renderContextAL: backend.al, backend: backend.name });
-  Tr2Renderer.SetShaderModel(TR2SHADERMODEL.TR2SM_3_0_DEPTH);
-  device.width = canvas.width;
-  device.height = canvas.height;
   spike.backendName = backend.name;
-  spike.adapter = await navigator.gpu.requestAdapter().then(a => a?.info ? `${a.info.vendor} ${a.info.architecture} ${a.info.device} ${a.info.description}`.trim() : "unknown");
+  spike.effectTarget = effectTarget;
+  if (backend.name === "webgpu")
+    spike.adapter = await navigator.gpu.requestAdapter().then(a => a?.info ? `${a.info.vendor} ${a.info.architecture} ${a.info.device} ${a.info.description}`.trim() : "unknown");
+  else
+  {
+    const gl = canvas.getContext("webgl2");
+    const info = gl.getExtension("WEBGL_debug_renderer_info");
+    spike.adapter = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : String(gl.getParameter(gl.RENDERER));
+  }
+  // The canvas as a render target: WebGPU's is the backend's own, WebGL2's is the layer's default back buffer.
+  const canvasTarget = () => (backend.name === "webgpu" ? backend.renderTarget : backend.al.GetDefaultBackBuffer());
 
-  const renderContext = Tr2RenderContext_GetMainThreadRenderContext();
 
   // Blue is host-pumped: resources only finish loading while something calls PumpOS.
   let loading = true;
@@ -282,8 +249,8 @@ async function Main()
 
   const view = new TriView();
   const projection = new TriProjection();
-  const frameVS = CreateRawData("ShatteredPerFrameVSData");
-  const framePS = CreateRawData("ShatteredPerFramePSData");
+  const frameVS = RawData.create("ShatteredPerFrameVSData");
+  const framePS = RawData.create("ShatteredPerFramePSData");
   const frameVSBuffer = new Tr2ConstantBufferAL();
   const framePSBuffer = new Tr2ConstantBufferAL();
   const viewProjection = mat4.create();
@@ -387,7 +354,7 @@ async function Main()
     // Pass 3: the watercolour pass over both, onto the canvas.
     callback(() =>
     {
-      backend.al.SetRenderTarget(0, backend.renderTarget);
+      backend.al.SetRenderTarget(0, canvasTarget());
       backend.al.SetDepthStencil(null);
       esm().SetFullScreenViewport();
       paintEffect.SetParameter__TextureAL("SceneColour", colourTarget.GetRenderTarget());
@@ -403,7 +370,11 @@ async function Main()
   loading = false;
   // The frame loop: Blue's tick runs Trinity, which runs the device's render jobs.
   const frameTimes = [];
-  const gpuDevice = backend.webgpu.GetDevice();
+  const gpuDevice = backend.webgpu?.GetDevice() ?? null;
+  const gl = gpuDevice ? null : canvas.getContext("webgl2");
+  // A canvas read asked for through spike.readCanvas, done inside the frame that drew it.
+  let pendingRead = null;
+  const probe = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
   let last = performance.now();
   const tick = now =>
   {
@@ -424,7 +395,30 @@ async function Main()
     if (BENCH && !spike.bench && frameTimes.length < BENCH && spike.frames > 20)
     {
       const index = frameTimes.length;
-      gpuDevice.queue.onSubmittedWorkDone().then(() => { if (frameTimes[index]) frameTimes[index].done = performance.now() - before; });
+      if (gpuDevice) gpuDevice.queue.onSubmittedWorkDone().then(() => { if (frameTimes[index]) frameTimes[index].done = performance.now() - before; });
+      else { gl.finish(); queueMicrotask(() => { if (frameTimes[index]) frameTimes[index].done = performance.now() - before; }); }
+    }
+    if (pendingRead)
+    {
+      // Copy the canvas while this frame's picture is still in it, and say what is there.
+      const resolve = pendingRead;
+      pendingRead = null;
+      probe.canvas.width = canvas.width;
+      probe.canvas.height = canvas.height;
+      probe.drawImage(canvas, 0, 0);
+      const data = probe.getImageData(0, 0, canvas.width, canvas.height).data;
+      const colours = new Set();
+      let dark = 0, sum = 0;
+      for (let i = 0; i < data.length; i += 4 * 7)
+      {
+        colours.add((data[i] << 16) | (data[i + 1] << 8) | data[i + 2]);
+        const luma = (data[i] * 3 + data[i + 1] * 6 + data[i + 2]) / 10;
+        sum += luma;
+        if (luma < 150) dark++;
+      }
+      const samples = Math.ceil(data.length / 28);
+      const at = (x, y) => { const o = (Math.floor(y * canvas.height) * canvas.width + Math.floor(x * canvas.width)) * 4; return [ data[o], data[o + 1], data[o + 2], data[o + 3] ]; };
+      resolve({ width: canvas.width, height: canvas.height, distinctColours: colours.size, meanLuma: +(sum / samples).toFixed(2), darkShare: +(dark / samples).toFixed(4), corner: at(0.02, 0.02), centre: at(0.5, 0.5) });
     }
     if (BENCH && spike.frames > 20 && !spike.bench)
     {
@@ -451,6 +445,7 @@ async function Main()
 
   Object.assign(spike, {
     ready: true, state, canvas, job, renderContext, backend, meta,
+    readCanvas: () => new Promise(resolve => { pendingRead = resolve; }),
     setYaw(degrees) { state.yaw = degrees * Math.PI / 180; },
     setTime(seconds) { state.time = seconds; if (HELD_YAW === null) state.yaw = seconds * 0.5; },
     status: () => job.status,

@@ -2646,6 +2646,24 @@ export class TriGeometryRes extends BlueAsyncRes
     this._isPrepared = this._isGood = true;
   }
 
+  /**
+   * Installs decoded mesh data a host built in memory and marks the resource loaded,
+   * as PrepareFromGrannyRes does for a Granny source. The public entry for geometry
+   * that never was a file.
+   *
+   * @cjs Ours (Shattered Reach fork); no Carbon counterpart.
+   * @param {object} data Decoded CMF-shaped data (`{ meshes: [...] }`), kept by reference.
+   * @returns {boolean} Whether the meshes were installed and the resource is good.
+   */
+  PrepareFromCmfData(data)
+  {
+    if (!this.SetupMeshes__CmfData(data)) return false;
+    this.SetupSkeletons__CmfData(data);
+    this._useCMF = true;
+    this._isPrepared = this._isGood = true;
+    return true;
+  }
+
   /** Opaque browser device allocations, supplied by Tr2DeviceResource. */
   __adapterResources = null;
 

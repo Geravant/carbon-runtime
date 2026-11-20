@@ -2,6 +2,10 @@ import { CjsSchema } from "#schema";
 import { CjsConstantPayload } from "#interfaces";
 import { CjsPerFrameLayouts } from "./CjsPerFrameLayouts.js";
 import { CjsPerObjectLayouts } from "./CjsPerObjectLayouts.js";
+import { CjsConstantLayout } from "./CjsConstantLayout.js";
+
+/** @cjs Ours (Shattered Reach fork): host layouts by struct name, read by RawData.create after the two catalogs. */
+const hostLayouts = new Map();
 
 
 // GPU-free per-object / per-frame constant data.
@@ -587,7 +591,8 @@ export class RawData extends CjsConstantPayload
   static create(struct)
   {
     const layout = CjsPerObjectLayouts.ToRawLayout(struct)
-      ?? CjsPerFrameLayouts.ToRawLayout(struct);
+      ?? CjsPerFrameLayouts.ToRawLayout(struct)
+      ?? (hostLayouts.has(struct) ? CjsConstantLayout.ToRawLayout(hostLayouts.get(struct)) : null);
 
     if (!layout)
     {
@@ -603,6 +608,29 @@ export class RawData extends CjsConstantPayload
     }
 
     return new RawData(layout, floats, uints, struct);
+  }
+
+  /**
+   * Registers a host's own constant layouts, so `RawData.create(struct)` finds them beside the
+   * two catalogs (which are closed lists of the engine's structs).
+   *
+   * @cjs Ours (Shattered Reach fork); no Carbon counterpart.
+   * @param {object} groups Layout groups in the catalogs' declaration vocabulary
+   *   (`{ Group: { vs: { struct, fields }, ps: {...} } }`, see CjsConstantLayout.BuildLayouts).
+   * @param {string} [owner="host"] Named in thrown messages.
+   * @returns {string[]} The struct names registered.
+   * @throws {Error} When a struct name is already in a catalog or registered.
+   */
+  static RegisterLayouts(groups, owner = "host")
+  {
+    const layouts = CjsConstantLayout.BuildLayouts(groups, owner);
+    for (const struct of layouts.keys())
+    {
+      if (hostLayouts.has(struct) || CjsPerObjectLayouts.ToRawLayout(struct) || CjsPerFrameLayouts.ToRawLayout(struct))
+        throw new Error(`RawData.RegisterLayouts: struct "${struct}" (${owner}) is already declared`);
+    }
+    for (const [ struct, layout ] of layouts) hostLayouts.set(struct, layout);
+    return [ ...layouts.keys() ];
   }
 
   /** The packed Float32 slice - what the engine uploader memcpys/binds. */

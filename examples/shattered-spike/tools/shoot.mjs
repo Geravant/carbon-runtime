@@ -1,9 +1,16 @@
 // Runs the spike page in headless system Chrome with WebGPU and captures it.
 //
 //   node examples/shattered-spike/tools/shoot.mjs [--probe] [--bench] [--angles 0,45,...] [--ships N]
+//        [--backend webgpu|webgl2] [--gpu metal|swiftshader] [--out m1] [--executable <chromium>] [--strict]
 //
 // Serves examples/shattered-spike/ from a free local port for the run and stops the server at
-// the end. Audio is muted. Screenshots go to ../shots/.
+// the end. Audio is muted. Screenshots go to ../shots/ (or ../shots/<--out>/).
+//
+// --backend webgl2 runs Chrome with WebGPU disabled and asks the page for the WebGL2 backend.
+// --gpu swiftshader runs on the software rasteriser, as a machine with no GPU does: WebGPU through
+//   Dawn's SwiftShader adapter, WebGL2 through ANGLE on SwiftShader.
+// --executable names a Chromium binary instead of the installed Chrome (the test server's).
+// --strict exits 1 when the page failed, a request went unanswered, or the canvas read is blank.
 import { createServer } from "node:http";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { dirname, extname, join, normalize } from "node:path";
@@ -17,6 +24,10 @@ const flag = name => args.includes(name);
 const option = (name, fallback) => (args.includes(name) ? args[args.indexOf(name) + 1] : fallback);
 
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".bin": "application/octet-stream", ".png": "image/png" };
+const BACKEND = option("--backend", "webgpu");
+const GPU = option("--gpu", process.platform === "darwin" ? "metal" : "swiftshader");
+const OUT = option("--out", "");
+let failed = false;
 const requests = [];
 const server = createServer(async (request, response) =>
 {
@@ -38,14 +49,23 @@ const server = createServer(async (request, response) =>
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
 const base = `http://127.0.0.1:${server.address().port}/`;
 
+const gpuArgs = {
+  "webgpu/metal": [ "--enable-unsafe-webgpu", "--enable-features=Vulkan", "--use-angle=metal", "--ignore-gpu-blocklist" ],
+  "webgl2/metal": [ "--disable-features=WebGPU", "--disable-blink-features=WebGPU", "--use-angle=metal", "--ignore-gpu-blocklist" ],
+  "webgpu/swiftshader": [ "--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-features=Vulkan", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--disable-gpu-sandbox" ],
+  "webgl2/swiftshader": [ "--disable-features=WebGPU", "--disable-blink-features=WebGPU", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist" ]
+}[`${BACKEND}/${GPU}`];
+if (!gpuArgs) throw new Error(`no flag set for --backend ${BACKEND} --gpu ${GPU}`);
+const extraArgs = option("--chrome-args", "").split(" ").filter(Boolean);
 const browser = await chromium.launch({
-  channel: "chrome",
+  ...(option("--executable") ? { executablePath: option("--executable") } : { channel: "chrome" }),
   headless: true,
-  args: [ "--mute-audio", "--enable-unsafe-webgpu", "--enable-features=Vulkan", "--use-angle=metal", "--ignore-gpu-blocklist", ...(flag("--novsync") ? [ "--disable-gpu-vsync", "--disable-frame-rate-limit" ] : []) ]
+  args: [ "--mute-audio", "--no-sandbox", ...gpuArgs, ...extraArgs, ...(flag("--novsync") ? [ "--disable-gpu-vsync", "--disable-frame-rate-limit" ] : []) ]
 });
 const width = Number(option("--width", 1280)), height = Number(option("--height", 720));
 const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: Number(option("--ratio", 1)) });
 const log = [];
+const shots = join(root, "shots", OUT);
 
 async function open(query)
 {
@@ -53,16 +73,19 @@ async function open(query)
   page.on("console", message => log.push(`[${message.type()}] ${message.text()}`));
   page.on("pageerror", error => log.push(`[pageerror] ${error.stack ?? error}`));
   const started = Date.now();
-  await page.goto(`${base}index.html?${query}`);
+  await page.goto(`${base}index.html?${BACKEND === "webgl2" ? "backend=webgl2&" : ""}${query}`);
   await page.waitForFunction(() => window.__spike && (window.__spike.error || (window.__spike.ready && window.__spike.frames > 5)), null, { timeout: Number(option("--wait", 20000)) }).catch(() => {});
-  const state = await page.evaluate(() => ({ ready: window.__spike?.ready, error: window.__spike?.error, frames: window.__spike?.frames, firstFrameMs: window.__spike?.firstFrameMs, backend: window.__spike?.backendName, diagnostics: (window.__spike?.diagnostics ?? []).slice(0, 6), jobStatus: window.__spike?.status?.() }));
+  const state = await page.evaluate(() => ({ ready: window.__spike?.ready, error: window.__spike?.error, frames: window.__spike?.frames, firstFrameMs: window.__spike?.firstFrameMs, backend: window.__spike?.backendName, adapter: window.__spike?.adapter, hasWebGPU: !!navigator.gpu, diagnostics: (window.__spike?.diagnostics ?? []).slice(0, 6), jobStatus: window.__spike?.status?.() }));
   state.wallMs = Date.now() - started;
+  // What a canvas read gives back, taken inside a frame: a blank or single-colour canvas is not a picture.
+  if (state.ready && !state.error) state.canvasRead = await page.evaluate(() => window.__spike.readCanvas());
+  if (!state.ready || state.error || state.diagnostics.length || !(state.canvasRead?.distinctColours > 50)) failed = true;
   return { page, state };
 }
 
 try
 {
-  await mkdir(join(root, "shots"), { recursive: true });
+  await mkdir(shots, { recursive: true });
   const ships = option("--ships", "1");
   const extra = option("--query", "");
   if (flag("--bench"))
@@ -73,11 +96,12 @@ try
       const { page, state } = await open(`ships=${count}&bench=${option("--frames", 300)}&${extra}`);
       await page.waitForFunction(() => window.__spike.bench || window.__spike.error, null, { timeout: 120000 }).catch(() => {});
       const bench = await page.evaluate(() => window.__spike.bench);
-      results.push({ ships: Number(count), firstFrameMs: state.firstFrameMs, error: state.error, bench });
-      await page.screenshot({ path: join(root, "shots", `bench-${count}-ships.png`) });
+      results.push({ ships: Number(count), backend: state.backend, adapter: state.adapter, firstFrameMs: state.firstFrameMs, error: state.error, canvasRead: state.canvasRead, bench });
+      await page.screenshot({ path: join(shots, `bench-${count}-ships.png`) });
       await page.close();
     }
-    console.log(JSON.stringify({ results, requests: requests.filter(r => !r.path.startsWith("shots")) }, null, 1));
+    console.log(JSON.stringify({ results }, null, 1));
+    await writeFile(join(shots, `bench-${BACKEND}.json`), `${JSON.stringify({ gpu: GPU, results }, null, 1)}\n`);
   }
   else if (flag("--sequence"))
   {
@@ -88,7 +112,7 @@ try
     const { page, state } = await open(`ships=${ships}&camera=${camera}&hold=1&${extra}`);
     console.log(JSON.stringify(state));
     const settle = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)))));
-    const directory = join(root, "shots", option("--name", camera));
+    const directory = join(shots, option("--name", camera));
     await mkdir(directory, { recursive: true });
     for (let i = 0; i < count; i++)
     {
@@ -142,7 +166,7 @@ try
         await page.evaluate(degrees => window.__spike.setYaw(degrees), angle);
         await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)))));
         const name = `${option("--name", `ship-${ships}`)}-${String(angle).padStart(3, "0")}.png`;
-        await page.screenshot({ path: join(root, "shots", name) });
+        await page.screenshot({ path: join(shots, name) });
         console.log(`shots/${name}`);
       }
     }
@@ -153,9 +177,11 @@ finally
 {
   if (log.length) console.log(log.slice(0, Number(option("--log", 40))).join("\n"));
   // The miss log: every path the page asked this server for, and whether a file of ours answered.
-  await writeFile(join(root, "shots", "requests.json"), `${JSON.stringify(requests.filter(r => !r.path.startsWith("shots")), null, 1)}\n`);
+  await writeFile(join(shots, `requests-${BACKEND}.json`), `${JSON.stringify(requests.filter(r => !r.path.startsWith("shots")), null, 1)}\n`);
   const missing = requests.filter(r => r.missing);
   console.log(`requests: ${requests.length}, unanswered: ${missing.length}${missing.length ? ` (${[ ...new Set(missing.map(r => r.path)) ].join(", ")})` : ""}`);
   await browser.close();
   await new Promise(resolve => server.close(resolve));
+  if (missing.length) failed = true;
+  if (flag("--strict") && failed) process.exitCode = 1;
 }

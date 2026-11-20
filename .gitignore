@@ -20,3 +20,7 @@ CLAUDE.md
 
 # Carbon character, interior and Wod classes ported side by side for comparison; never committed, imported or exported.
 /src/character/carbon-donor/
+
+# Shattered Reach slim build outputs (shattered/scripts).
+/shattered/dist/
+/shattered/pack/
