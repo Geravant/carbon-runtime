@@ -79,12 +79,12 @@ const { written, failed } = BuildEffects({ src: "src/carbon/effects", out: "publ
 
 ## What is in the bundle
 
-`shattered/src/index.js` is the list of what the package exports. `shattered/dist/sizes.json` (also `carbon.minifiedAlwaysLoaded` in the package's `package.json`) gives the minified size of what a page always loads. The browser backend with the WebGPU layer, and the WebGL2 layer, are separate chunks fetched when a backend is acquired. The two DXBC translator chunks are in the package but are only fetched by a host that asks for a translator; ours does not.
+`shattered/src/index.js` is the list of what the package exports. `shattered/dist/sizes.json` (also `carbon.minifiedAlwaysLoaded` in the package's `package.json`) gives the minified size of what a page always loads. The browser backend with the WebGPU layer, and the WebGL2 layer, are separate chunks fetched when a backend is acquired. The DXBC effect translators are not in the package, so `AcquireBackend` must be called with `translator: false` (`ShatteredBoot` does).
 
 Three things are swapped at build time instead of editing engine files (`shattered/scripts/build-slim.mjs`):
 
 - the Trinity barrel that `CjsLibrary` imports (every Trinity and EVE class) is replaced by `shattered/src/trinityForLibrary.js`, which names the five classes `CjsLibrary` uses;
 - the engine's default resource registrations (`src/core/configuration.js`) are replaced by `shattered/src/configuration.js`, which registers compiled effect containers only;
-- the dynamic imports of SOF, character and audio in `CjsLibrary` resolve to an empty module.
+- the dynamic imports of SOF, character and audio in `CjsLibrary`, and of the two DXBC effect translators in `CjsBrowserBackend`, resolve to an empty module.
 
 A host that needs a file format (textures, for example) passes it in `ShatteredBoot`'s `configuration` option, in the engine's own configuration vocabulary. The build fails if two exported barrels export the same name with different meanings (`export *` would silently export neither); name the wanted one in `shattered/src/index.js`.

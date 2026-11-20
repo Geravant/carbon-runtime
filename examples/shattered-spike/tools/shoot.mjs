@@ -1,7 +1,7 @@
 // Runs the spike page in headless system Chrome with WebGPU and captures it.
 //
 //   node examples/shattered-spike/tools/shoot.mjs [--probe] [--bench] [--angles 0,45,...] [--ships N]
-//        [--backend webgpu|webgl2] [--gpu metal|swiftshader] [--out m1] [--executable <chromium>] [--strict]
+//        [--backend webgpu|webgl2] [--gpu metal|swiftshader|stand] [--out m1] [--executable <chromium>] [--strict]
 //
 // Serves examples/shattered-spike/ from a free local port for the run and stops the server at
 // the end. Audio is muted. Screenshots go to ../shots/ (or ../shots/<--out>/).
@@ -52,7 +52,16 @@ const base = `http://127.0.0.1:${server.address().port}/`;
 const gpuArgs = {
   "webgpu/metal": [ "--enable-unsafe-webgpu", "--enable-features=Vulkan", "--use-angle=metal", "--ignore-gpu-blocklist" ],
   "webgl2/metal": [ "--disable-features=WebGPUService", "--use-angle=metal", "--ignore-gpu-blocklist" ],
-  "webgpu/swiftshader": [ "--enable-unsafe-webgpu", "--use-webgpu-adapter=swiftshader", "--enable-features=Vulkan", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist", "--disable-gpu-sandbox" ],
+  // WebGPU with no GPU, found by trial on the test server (Debian Chromium 156 in the stand's image). Asking
+  // for the "opengles" adapter still gives Dawn's SwiftShader adapter, and it is the only set tried where the
+  // device survives AND the canvas is presented (screenshot, drawImage and GPU readback all agree). With
+  // --use-webgpu-adapter=swiftshader the adapter is offered but every device request fails ("A valid external
+  // Instance reference no longer exists"); adding --use-vulkan=swiftshader --disable-vulkan-surface and the
+  // ANGLE-on-Vulkan features keeps the device alive but the canvas stays blank.
+  "webgpu/swiftshader": [ "--enable-unsafe-webgpu", "--use-webgpu-adapter=opengles", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist" ],
+  // Exactly what the game's stand wrapper passes (stand/chrome.sh), nothing else: WebGPU is off by default in
+  // Linux Chromium, so the page's own fallback has to land on WebGL2.
+  "webgl2/stand": [ "--enable-unsafe-swiftshader", "--use-angle=swiftshader" ],
   "webgl2/swiftshader": [ "--disable-features=WebGPUService", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist" ]
 }[`${BACKEND}/${GPU}`];
 if (!gpuArgs) throw new Error(`no flag set for --backend ${BACKEND} --gpu ${GPU}`);

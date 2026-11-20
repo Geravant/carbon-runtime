@@ -13,8 +13,9 @@
 //     ../src/trinityForLibrary.js, the five names CjsLibrary uses from their own modules;
 //   - core/configuration.js (the default format and resource registrations: Black, GR2, DDS, ...)
 //     is replaced by ../src/configuration.js;
-//   - the dynamic imports CjsLibrary keeps for SOF, character and audio resolve to an empty module
-//     (they are only reached when a host asks for those services, which ShatteredBoot does not).
+//   - the dynamic imports CjsLibrary keeps for SOF, character and audio, and CjsBrowserBackend's of
+//     the two dx11 effect translators, resolve to an empty module (they are only reached when a host
+//     asks for those services or for a translator, which ShatteredBoot does not).
 import { transformAsync } from "@babel/core";
 import { build } from "esbuild";
 import { createHash } from "node:crypto";
@@ -34,7 +35,9 @@ const sourceRequire = createRequire(path.join(root, "package.json"));
 const manifest = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 const dependencies = new Set(Object.keys(manifest.dependencies ?? {}));
 const src = path.join(root, "src") + path.sep;
-const EMPTY = /[\\/]src[\\/](sof|character|audio)[\\/]/u;
+// Dynamic imports that resolve to an empty module: EVE's services, and the dx11 (DXBC) effect translators
+// and Black reader that only a host loading EVE's files reaches.
+const EMPTY = /[\\/]src[\\/](sof|character|audio|resource[\\/]formats[\\/](webgpu|webgl)|blue[\\/]formats[\\/]black)[\\/]/u;
 
 const enginePlugin = {
   name: "shattered-engine-source",
