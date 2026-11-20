@@ -1,0 +1,53 @@
+{
+ "gpu": "swiftshader",
+ "results": [
+  {
+   "ships": 1,
+   "backend": "webgpu",
+   "adapter": "google swiftshader",
+   "firstFrameMs": 276.5999984741211,
+   "error": null,
+   "canvasRead": {
+    "width": 480,
+    "height": 270,
+    "distinctColours": 3336,
+    "meanLuma": 204.63,
+    "darkShare": 0.1331,
+    "corner": [
+     220,
+     215,
+     206,
+     255
+    ],
+    "centre": [
+     214,
+     206,
+     195,
+     255
+    ]
+   },
+   "bench": {
+    "adapter": "google swiftshader",
+    "ships": 1,
+    "frames": 41,
+    "width": 480,
+    "height": 270,
+    "interval": {
+     "mean": 156.49756097560976,
+     "median": 183.20000000000073,
+     "p95": 200
+    },
+    "cpu": {
+     "mean": 1.1560972260265816,
+     "median": 1.0999984741210938,
+     "p95": 1.4000015258789062
+    },
+    "submitToDone": {
+     "mean": 469.36315797504625,
+     "median": 487.79999923706055,
+     "p95": 500.5999984741211
+    }
+   }
+  }
+ ]
+}

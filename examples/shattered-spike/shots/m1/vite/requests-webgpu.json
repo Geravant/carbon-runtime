@@ -1,0 +1,42 @@
+[
+ {
+  "path": "index.html",
+  "bytes": 684
+ },
+ {
+  "path": "assets/index-DsuBd4bv.js",
+  "bytes": 3162321
+ },
+ {
+  "path": "assets/CjsBrowserBackend-GNSPYDDM-Cm6FTG9S.js",
+  "bytes": 135696
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/system/blit.sm_depth",
+  "bytes": 2842
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/system/blitfiltered.sm_depth",
+  "bytes": 2592
+ },
+ {
+  "path": "data/cruiser.json",
+  "bytes": 8768
+ },
+ {
+  "path": "data/cruiser.bin",
+  "bytes": 823440
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/hull.sm_depth",
+  "bytes": 7845
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/hullnormal.sm_depth",
+  "bytes": 4559
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/watercolour.sm_depth",
+  "bytes": 8060
+ }
+]

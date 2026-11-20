@@ -5,14 +5,14 @@
    "ships": 1,
    "backend": "webgl2",
    "adapter": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
-   "firstFrameMs": 76,
+   "firstFrameMs": 83,
    "error": null,
    "canvasRead": {
     "width": 1280,
     "height": 720,
-    "distinctColours": 10756,
-    "meanLuma": 205.21,
-    "darkShare": 0.1442,
+    "distinctColours": 10690,
+    "meanLuma": 205.2,
+    "darkShare": 0.1444,
     "corner": [
      220,
      215,
@@ -33,19 +33,19 @@
     "width": 1280,
     "height": 720,
     "interval": {
-     "mean": 16.666346153846167,
+     "mean": 16.666025641025648,
      "median": 16.699999999999818,
      "p95": 16.700000000000728
     },
     "cpu": {
-     "mean": 0.5923076898623736,
-     "median": 0.5999999046325684,
-     "p95": 0.8999999761581421
+     "mean": 0.7766025582185159,
+     "median": 0.8000000715255737,
+     "p95": 1.2000000476837158
     },
     "submitToDone": {
-     "mean": 0.6136666663487752,
-     "median": 0.6000000238418579,
-     "p95": 1
+     "mean": 0.8036666591962178,
+     "median": 0.8999999761581421,
+     "p95": 1.2999999523162842
     }
    }
   },
@@ -53,13 +53,13 @@
    "ships": 30,
    "backend": "webgl2",
    "adapter": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Max, Unspecified Version)",
-   "firstFrameMs": 77.39999997615814,
+   "firstFrameMs": 84.79999995231628,
    "error": null,
    "canvasRead": {
     "width": 1280,
     "height": 720,
-    "distinctColours": 8652,
-    "meanLuma": 210.57,
+    "distinctColours": 8681,
+    "meanLuma": 210.58,
     "darkShare": 0.1057,
     "corner": [
      220,
@@ -81,19 +81,19 @@
     "width": 1280,
     "height": 720,
     "interval": {
-     "mean": 16.66602564102565,
+     "mean": 16.66602564102566,
      "median": 16.699999999999818,
-     "p95": 16.799999999999727
+     "p95": 16.700000000000728
     },
     "cpu": {
-     "mean": 1.1413461573612995,
-     "median": 1,
-     "p95": 1.899999976158142
+     "mean": 1.7778846143912046,
+     "median": 1.899999976158142,
+     "p95": 2.399999976158142
     },
     "submitToDone": {
-     "mean": 1.1586666707197826,
-     "median": 1.0999999046325684,
-     "p95": 1.899999976158142
+     "mean": 1.807999997138977,
+     "median": 1.899999976158142,
+     "p95": 2.399999976158142
     }
    }
   }

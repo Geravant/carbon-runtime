@@ -26,7 +26,7 @@ npm install ./vendor/geravant-carbon-runtime-slim-<version>.tgz
 
 `package.json` then holds `"@geravant/carbon-runtime-slim": "file:vendor/geravant-carbon-runtime-slim-<version>.tgz"`, and the lock file holds its integrity hash. To move to a newer engine, pack again, replace the file and reinstall; delete the old tarball.
 
-The package is one ES module with lazy chunks and no dependencies. Vite bundles it as it is. The package's files are not minified; the game's production build minifies them.
+The package is one ES module with lazy chunks and no dependencies. Vite 6 bundles it as it is (checked: a `vite build` of the spike page over the tarball runs on both backends; the main chunk is 3,162 KB raw, 710 KB gzip). The package's files are not minified; the game's production build minifies them. Vite prints one warning, that `new URL("./CjsResManWorker.js", import.meta.url)` does not exist at build time: that is the engine's optional resource-loading worker, which `ShatteredBoot` does not start.
 
 ```js
 import { ShatteredBoot, RawData, TriGeometryRes, Tr2Effect, blue } from "@geravant/carbon-runtime-slim";
@@ -76,6 +76,23 @@ const { written, failed } = BuildEffects({ src: "src/carbon/effects", out: "publ
 ```
 
 `<src>/a/name.fx` becomes `<out>/graphics/effect.webgpu/<prefix>/a/name.sm_{depth,hi,lo}` (WGSL) and `<out>/graphics/effect.webgl/<prefix>/a/name.sm_*` (GLSL ES 3.00). The page names it `res:/graphics/effect/<prefix>/a/name.fx`. `--targets webgpu` or `--models depth` narrow what is written.
+
+## Machines with no GPU (the test server)
+
+Checked on the test server in a container built like the game's stand image (Debian Chromium 156, `--network none`, 2 CPUs, 2 GB), at 1280×720:
+
+| Chromium flags | Backend the page gets | Result |
+|---|---|---|
+| `--enable-unsafe-swiftshader --use-angle=swiftshader` (what `stand/chrome.sh` passes today) | WebGL2, by the engine's own fallback (Linux Chromium offers no WebGPU adapter by default) | draws correctly; a canvas read returns real pixels |
+| the same plus `--enable-unsafe-webgpu --use-webgpu-adapter=opengles --ignore-gpu-blocklist` | WebGPU on Dawn's SwiftShader adapter | draws correctly; a canvas read returns real pixels |
+| `--enable-unsafe-webgpu --use-webgpu-adapter=swiftshader` (with or without `--enable-features=Vulkan`) | none: an adapter is offered but every device request fails | page error |
+| those plus `--use-vulkan=swiftshader --disable-vulkan-surface --enable-features=Vulkan,VulkanFromANGLE,DefaultANGLEVulkan --disable-gpu-sandbox` | WebGPU device works, GPU readback is right | the canvas is never presented: screenshots and canvas reads are blank |
+
+So the stand needs no change for the WebGL2 path, and one more flag set to test the WebGPU path.
+
+Software rendering is slow and scales with pixels, not ships. One frame of the spike (hull pass, normal pass, full-screen watercolour pass) takes about 0.7 s on WebGL2 and 0.9 s on WebGPU at 1280×720, 0.9 s and 1.1 s with 30 ships, and about 0.12 s and 0.16 s at 480×270. The engine's own CPU time is 1 to 2 ms a frame. Tests on the server should use a small canvas, wait for a frame count instead of a time, and read scene state from data attributes; a canvas read works when a pixel check is wanted.
+
+Read the canvas inside the frame that drew it (same task as `blue.os.PumpOS()`), by `drawImage` onto a 2D canvas: a WebGPU canvas is cleared after it is presented. `examples/shattered-spike/tools/box/` holds the image and probes used.
 
 ## What is in the bundle
 

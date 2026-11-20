@@ -5,74 +5,38 @@
  },
  {
   "path": "dist/spike.js",
-  "bytes": 1100463
+  "bytes": 1100189
  },
  {
-  "path": "dist/chunks/chunk-ODXTABB3.js",
-  "bytes": 127921
+  "path": "dist/chunks/chunk-NUSWNX3P.js",
+  "bytes": 127773
  },
  {
-  "path": "dist/chunks/chunk-7BZNKX2U.js",
-  "bytes": 19314
+  "path": "dist/chunks/chunk-GDYG3RPM.js",
+  "bytes": 19252
  },
  {
-  "path": "dist/chunks/chunk-UBI2EK7U.js",
-  "bytes": 122937
+  "path": "dist/chunks/chunk-XE3FN6U4.js",
+  "bytes": 57069
  },
  {
-  "path": "dist/chunks/chunk-GZQZ5CRC.js",
-  "bytes": 57102
+  "path": "dist/chunks/chunk-5D7DLW7X.js",
+  "bytes": 1363363
  },
  {
-  "path": "dist/chunks/chunk-UC5OFZOX.js",
-  "bytes": 1175176
+  "path": "dist/chunks/chunk-YMDC7PZM.js",
+  "bytes": 413669
  },
  {
-  "path": "dist/chunks/chunk-OEBU3GPK.js",
-  "bytes": 703
+  "path": "dist/chunks/chunk-KB7WVJHK.js",
+  "bytes": 5271
  },
  {
-  "path": "dist/chunks/chunk-SNOX6LXA.js",
-  "bytes": 57192
+  "path": "dist/chunks/CjsBrowserBackend-GNSPYDDM-XSQEK5CV.js",
+  "bytes": 128090
  },
  {
-  "path": "dist/chunks/chunk-W2XMNTW7.js",
-  "bytes": 12309
- },
- {
-  "path": "dist/chunks/chunk-43L77ELV.js",
-  "bytes": 154322
- },
- {
-  "path": "dist/chunks/chunk-5AOIYZIS.js",
-  "bytes": 155046
- },
- {
-  "path": "dist/chunks/chunk-5UKVJYYY.js",
-  "bytes": 1498
- },
- {
-  "path": "dist/chunks/chunk-4Y3ERDCX.js",
-  "bytes": 66173
- },
- {
-  "path": "dist/chunks/chunk-XDBZCTFB.js",
-  "bytes": 61123
- },
- {
-  "path": "dist/chunks/chunk-LRFHEORQ.js",
-  "bytes": 3782
- },
- {
-  "path": "dist/chunks/CjsBrowserBackend-AMTDZV42-UMG7QNDX.js",
-  "bytes": 128291
- },
- {
-  "path": "dist/chunks/chunk-TEDPTM3B.js",
-  "bytes": 200
- },
- {
-  "path": "dist/chunks/chunk-6IVPHPM7.js",
+  "path": "dist/chunks/chunk-ZUWZGR3I.js",
   "bytes": 1159
  },
  {
@@ -88,16 +52,16 @@
   "bytes": 8768
  },
  {
-  "path": "res/graphics/effect.webgpu/shattered/hullnormal.sm_depth",
-  "bytes": 4559
+  "path": "res/graphics/effect.webgpu/shattered/hull.sm_depth",
+  "bytes": 7845
  },
  {
   "path": "data/cruiser.bin",
   "bytes": 823440
  },
  {
-  "path": "res/graphics/effect.webgpu/shattered/hull.sm_depth",
-  "bytes": 7845
+  "path": "res/graphics/effect.webgpu/shattered/hullnormal.sm_depth",
+  "bytes": 4559
  },
  {
   "path": "res/graphics/effect.webgpu/shattered/watercolour.sm_depth",
@@ -109,74 +73,38 @@
  },
  {
   "path": "dist/spike.js",
-  "bytes": 1100463
+  "bytes": 1100189
  },
  {
-  "path": "dist/chunks/chunk-7BZNKX2U.js",
-  "bytes": 19314
+  "path": "dist/chunks/chunk-NUSWNX3P.js",
+  "bytes": 127773
  },
  {
-  "path": "dist/chunks/chunk-UBI2EK7U.js",
-  "bytes": 122937
+  "path": "dist/chunks/chunk-GDYG3RPM.js",
+  "bytes": 19252
  },
  {
-  "path": "dist/chunks/chunk-ODXTABB3.js",
-  "bytes": 127921
+  "path": "dist/chunks/chunk-XE3FN6U4.js",
+  "bytes": 57069
  },
  {
-  "path": "dist/chunks/chunk-GZQZ5CRC.js",
-  "bytes": 57102
+  "path": "dist/chunks/chunk-KB7WVJHK.js",
+  "bytes": 5271
  },
  {
-  "path": "dist/chunks/chunk-OEBU3GPK.js",
-  "bytes": 703
+  "path": "dist/chunks/chunk-YMDC7PZM.js",
+  "bytes": 413669
  },
  {
-  "path": "dist/chunks/chunk-UC5OFZOX.js",
-  "bytes": 1175176
+  "path": "dist/chunks/chunk-5D7DLW7X.js",
+  "bytes": 1363363
  },
  {
-  "path": "dist/chunks/chunk-W2XMNTW7.js",
-  "bytes": 12309
+  "path": "dist/chunks/CjsBrowserBackend-GNSPYDDM-XSQEK5CV.js",
+  "bytes": 128090
  },
  {
-  "path": "dist/chunks/chunk-SNOX6LXA.js",
-  "bytes": 57192
- },
- {
-  "path": "dist/chunks/chunk-43L77ELV.js",
-  "bytes": 154322
- },
- {
-  "path": "dist/chunks/chunk-5AOIYZIS.js",
-  "bytes": 155046
- },
- {
-  "path": "dist/chunks/chunk-5UKVJYYY.js",
-  "bytes": 1498
- },
- {
-  "path": "dist/chunks/chunk-4Y3ERDCX.js",
-  "bytes": 66173
- },
- {
-  "path": "dist/chunks/chunk-XDBZCTFB.js",
-  "bytes": 61123
- },
- {
-  "path": "dist/chunks/chunk-LRFHEORQ.js",
-  "bytes": 3782
- },
- {
-  "path": "dist/chunks/CjsBrowserBackend-AMTDZV42-UMG7QNDX.js",
-  "bytes": 128291
- },
- {
-  "path": "dist/chunks/chunk-TEDPTM3B.js",
-  "bytes": 200
- },
- {
-  "path": "dist/chunks/chunk-6IVPHPM7.js",
+  "path": "dist/chunks/chunk-ZUWZGR3I.js",
   "bytes": 1159
  },
  {

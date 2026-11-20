@@ -1,0 +1,101 @@
+{
+ "gpu": "swiftshader",
+ "results": [
+  {
+   "ships": 1,
+   "backend": "webgpu",
+   "adapter": "google swiftshader",
+   "firstFrameMs": 330.70000076293945,
+   "error": null,
+   "canvasRead": {
+    "width": 1280,
+    "height": 720,
+    "distinctColours": 12618,
+    "meanLuma": 209.58,
+    "darkShare": 0.1109,
+    "corner": [
+     220,
+     215,
+     206,
+     255
+    ],
+    "centre": [
+     35,
+     46,
+     67,
+     255
+    ]
+   },
+   "bench": {
+    "adapter": "google swiftshader",
+    "ships": 1,
+    "frames": 60,
+    "width": 1280,
+    "height": 720,
+    "interval": {
+     "mean": 914.1316666666667,
+     "median": 916.5999999999985,
+     "p95": 1016.5999999999987
+    },
+    "cpu": {
+     "mean": 1.2149997711181642,
+     "median": 1.2000007629394531,
+     "p95": 1.6999969482421875
+    },
+    "submitToDone": {
+     "mean": 2729.2877191911666,
+     "median": 2711.3999977111816,
+     "p95": 2898.1000022888184
+    }
+   }
+  },
+  {
+   "ships": 30,
+   "backend": "webgpu",
+   "adapter": "google swiftshader",
+   "firstFrameMs": 281.4000015258789,
+   "error": null,
+   "canvasRead": {
+    "width": 1280,
+    "height": 720,
+    "distinctColours": 8377,
+    "meanLuma": 210.12,
+    "darkShare": 0.1039,
+    "corner": [
+     220,
+     215,
+     206,
+     255
+    ],
+    "centre": [
+     154,
+     140,
+     130,
+     255
+    ]
+   },
+   "bench": {
+    "adapter": "google swiftshader",
+    "ships": 30,
+    "frames": 60,
+    "width": 1280,
+    "height": 720,
+    "interval": {
+     "mean": 1121.6233333333332,
+     "median": 1116.5,
+     "p95": 1216.5999999999985
+    },
+    "cpu": {
+     "mean": 1.861666997273763,
+     "median": 1.7000007629394531,
+     "p95": 3.200000762939453
+    },
+    "submitToDone": {
+     "mean": 3363.1754389980383,
+     "median": 3334.900001525879,
+     "p95": 3586.900001525879
+    }
+   }
+  }
+ ]
+}

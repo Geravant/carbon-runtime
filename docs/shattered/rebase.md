@@ -57,7 +57,7 @@ What each failure means:
 
 - **`No matching export ... trinityForLibrary.js`**: upstream's `CjsLibrary` now takes another name from the Trinity barrel. Add it to `shattered/src/trinityForLibrary.js` from its own module.
 - **`dropped export X`**: two barrels the slim entry re-exports now both export `X`. Name the one we want in `shattered/src/index.js`.
-- **The bundle grew a lot** (`shattered/dist/sizes.json`; it was 3,061 KB raw and 697 KB gzip, minified, at the first tarball): something we export started importing EVE code, or `CjsLibrary` gained a static import. `node shattered/scripts/build-slim.mjs --analyze` writes `shattered/dist/meta.json` (an esbuild metafile) to find it.
+- **The bundle grew a lot** (`shattered/dist/sizes.json`; it was 3,106 KB raw and 702 KB gzip, minified, at tarball `e4d85027f`): something we export started importing EVE code, or `CjsLibrary` gained a static import. `node shattered/scripts/build-slim.mjs --analyze` writes `shattered/dist/meta.json` (an esbuild metafile) to find it.
 - **The page fails or a request goes unanswered**: read the page error in the runner's output. An unanswered request for a `managed/...` effect path means the engine asks for a new built-in effect; write our own file for it, or make its path configurable the way `Tr2Blitter`'s are.
 - **`Unsupported configuration section` or a start-up error in `Initialize`**: `src/core/configuration.js` gained a section; mirror it in `shattered/src/configuration.js`.
 

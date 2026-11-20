@@ -171,6 +171,6 @@ fs.chmodSync(path.join(outdir, "tools", "build-effects.mjs"), 0o755);
   console.log(`exports: ${exported.size} names`);
 }
 if (args.includes("--analyze")) fs.writeFileSync(path.join(outdir, "meta.json"), JSON.stringify(written.metafile));
-const kb = bytes => `${(bytes / 1024).toFixed(0)} KB`;
+const kb = bytes => `${Math.round(bytes / 1000).toLocaleString("en-US")} KB`;
 console.log(`slim runtime (${measured.label}): always loaded ${kb(measured.always.raw)} raw / ${kb(measured.always.gzip)} gzip in ${measured.always.files} file(s)`);
 for (const row of measured.lazy) console.log(`  lazy ${row.file}: ${kb(row.raw)} raw / ${kb(row.gzip)} gzip`);

@@ -13,15 +13,17 @@
 // --strict exits 1 when the page failed, a request went unanswered, or the canvas read is blank.
 import { createServer } from "node:http";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
-import { dirname, extname, join, normalize } from "node:path";
+import { dirname, extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const root = join(here, "..");
 const args = process.argv.slice(2);
 const flag = name => args.includes(name);
 const option = (name, fallback) => (args.includes(name) ? args[args.indexOf(name) + 1] : fallback);
+// --root serves another build of the same page (a Vite build of it, for example); shots still land here.
+const root = option("--root") ? resolve(option("--root")) : join(here, "..");
+const shotsRoot = join(here, "..", "shots");
 
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".bin": "application/octet-stream", ".png": "image/png" };
 const BACKEND = option("--backend", "webgpu");
@@ -74,7 +76,7 @@ const browser = await chromium.launch({
 const width = Number(option("--width", 1280)), height = Number(option("--height", 720));
 const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: Number(option("--ratio", 1)) });
 const log = [];
-const shots = join(root, "shots", OUT);
+const shots = join(shotsRoot, OUT);
 
 async function open(query)
 {
