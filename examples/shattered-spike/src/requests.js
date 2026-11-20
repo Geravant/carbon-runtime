@@ -11,15 +11,17 @@
 //   floats    (M3 1)  float data textures (rgba32f, rgba16f), Load-read, updated in part
 //   loadcap   (M3 3)  LoadTexture maxSize; a canvas with no context as a texture
 //   timing    (M3 2, M4 2) a GPU time per job (TimeJob / TimeJobNow)
-//   camera    (M4 4)  EveCamera's fieldOfView with zoomCurve null
+//   camera    (M4 4)  EveCamera's fieldOfView with zoomCurve null, and OrbitCamera
+//   leak, capacity (M3 4, 5)  a pass's AlphaBlendEnable = false after an additive step; InstanceStream
+//   targets, halfResolution (skies 4, 3)  releasing render targets; a half-size draw with a filtered upsample
 //
-// URL: backend=webgl2 asks for WebGL2 only.
+// URL: backend=webgl2 asks for WebGL2 only; half=1 keeps drawing the half-resolution job after the checks.
 import {
   blue, BlueScriptCallback, PixelFormat, DepthStencilFormat, TriBatchType, Tr2RenderTarget, Tr2DepthStencil, Tr2Mesh, Tr2MeshArea,
   ITr2Renderable, RawData, CjsConstantLayout, TriGeometryRes, Tr2Effect, Tr2EffectStateManager, TriRenderJob, TriStepClear,
   TriStepPythonCB, TriStepRenderEffect, TriStepRenderObject, ShatteredBoot, DrawNow, PumpLoading, GetCanvasTarget, Tr2CurveLineSet,
   CreateTextureFromImage, UpdateTextureFromImage, LoadTexture, CreateTextureFromData, UpdateTextureFromData,
-  ReleaseGeometry, GeometryPoolStats, RegisteredResourceCount, CurveLineSpans, TimeJob, TimeJobNow, GpuTimingMethod,
+  ReleaseGeometry, ReleaseRenderTarget, GeometryPoolStats, RegisteredResourceCount, CurveLineSpans, TimeJob, TimeJobNow, GpuTimingMethod,
   EveCamera, OrbitCamera, CcpTime, TriDevice, InstanceStream, Tr2InstancedMesh
 } from "@geravant/carbon-runtime-slim";
 
@@ -125,8 +127,8 @@ async function Main()
   let loading = true;
   const pump = () => { if (!loading) return; PumpLoading(); requestAnimationFrame(pump); };
   requestAnimationFrame(pump);
-  const names = [ "req/territory", "req/wash", "req/washopaque", "req/paper", "req/spanline", "req/show", "req/show", "req/show", "req/show", "req/glow", "req/inst" ];
-  const [ territoryFx, washFx, washOpaqueFx, paperFx, lineFx, showRgba8Fx, showF32Fx, showF16Fx, showCapFx, glowFx, instFx ] = await Promise.all(names.map(LoadEffect));
+  const names = [ "req/territory", "req/wash", "req/washopaque", "req/paper", "req/spanline", "req/show", "req/show", "req/show", "req/show", "req/glow", "req/inst", "system/blitfiltered" ];
+  const [ territoryFx, washFx, washOpaqueFx, paperFx, lineFx, showRgba8Fx, showF32Fx, showF16Fx, showCapFx, glowFx, instFx, upsampleFx ] = await Promise.all(names.map(LoadEffect));
   loading = false;
 
   const scene = new Parts();
@@ -284,7 +286,7 @@ async function Main()
   {
     PumpLoading();
     spans.Upload();
-    DrawNow(job);
+    DrawNow(spike.loopJob ?? job);
     spike.frames++;
     probe.canvas.width = W; probe.canvas.height = H;
     probe.drawImage(canvas, 0, 0);
@@ -473,6 +475,71 @@ async function Main()
     state.renderTarget.validAfterOneTick = target.IsValid();
     scene.parts.splice(scene.parts.indexOf(part), 1);
     results.idleSweep = { ok: state.geometry.meshData && state.imageTexture.texture && state.dataTexture.texture, state };
+  }
+
+  // ---- targets (skies request 4): releasing a render target and a depth surface.
+  {
+    const a = new Tr2RenderTarget(), b = new Tr2RenderTarget(), d = new Tr2DepthStencil();
+    a.Create(64, 64, 1, PixelFormat.PIXEL_FORMAT_R8G8B8A8_UNORM);
+    b.Create(64, 64, 1, PixelFormat.PIXEL_FORMAT_R8G8B8A8_UNORM);
+    d.Create(64, 64, DepthStencilFormat.DSFMT_D32F, 1, 0, 0, renderContext);
+    const before = [ a.IsValid(), b.IsValid(), d.IsValid() ];
+    a.ReleaseResources();                       // no argument: nothing happens
+    ReleaseRenderTarget(b);
+    ReleaseRenderTarget(d);
+    for (let i = 0; i < 3; i++) await nextFrame();
+    const after = { releaseResourcesNoArgument: a.IsValid(), releaseRenderTarget: b.IsValid(), depthReleased: d.IsValid() };
+    b.Create(32, 32, 1, PixelFormat.PIXEL_FORMAT_R8G8B8A8_UNORM);
+    results.targets = { ok: before.every(Boolean) && after.releaseResourcesNoArgument && !after.releaseRenderTarget && !after.depthReleased && b.IsValid() && b.GetWidth() === 32,
+      before, after, createdAgain: [ b.IsValid(), b.GetWidth() ],
+      note: "ReleaseResources() with no storage mask is a no-op; ReleaseRenderTarget (Destroy + leave the registry) frees for good and stays freed over device ticks; Create makes it again" };
+    ReleaseRenderTarget(a);
+    ReleaseRenderTarget(b);
+  }
+
+  // ---- half resolution (skies request 3): the same scene into a half-size target, the paper pass into a second
+  // half-size target, then a filtered blit (our blitfiltered.fx, MIN_MAG_MIP_LINEAR) up to the canvas.
+  {
+    const hw = Math.ceil(W / 2), hh = Math.ceil(H / 2);
+    const halfColour = new Tr2RenderTarget(), halfPaper = new Tr2RenderTarget(), halfDepth = new Tr2DepthStencil();
+    halfColour.Create(hw, hh, 1, PixelFormat.PIXEL_FORMAT_R16G16B16A16_FLOAT);
+    halfPaper.Create(hw, hh, 1, PixelFormat.PIXEL_FORMAT_R8G8B8A8_UNORM);
+    halfDepth.Create(hw, hh, DepthStencilFormat.DSFMT_D32F, 1, 0, 0, renderContext);
+    const halfPaperStep = new TriStepRenderEffect();
+    halfPaperStep.effect = paperFx;
+    const upsample = new TriStepRenderEffect();
+    upsample.effect = upsampleFx;
+    const halfJob = new TriRenderJob();
+    halfJob.name = "ShatteredHalf";
+    for (const step of [
+      callback(() => { esm().SetRenderTarget(0, halfColour.GetRenderTarget()); esm().SetDepthStencilBuffer(halfDepth.GetDepthStencil());
+        // SetFullScreenViewport is the device's (canvas) size: a smaller target needs its own viewport.
+        esm().SetViewport({ x: 0, y: 0, width: hw, height: hh, minZ: 0, maxZ: 1 }); }),
+      clear,
+      callback(() => esm().SetViewport({ x: 0, y: 0, width: hw, height: hh, minZ: 0, maxZ: 1 })),
+      draw("opaque"), draw("opaque", later), draw("transparent"),
+      callback(() => { esm().SetRenderTarget(0, halfPaper.GetRenderTarget()); esm().SetDepthStencilBuffer(null); esm().SetViewport({ x: 0, y: 0, width: hw, height: hh, minZ: 0, maxZ: 1 });
+        paperFx.SetParameter__TextureAL("SceneColour", halfColour.GetRenderTarget()); }),
+      halfPaperStep,
+      // The canvas bound THROUGH the effect state manager: it then learns the canvas's size. Bound with backend.al, the
+      // manager keeps the half-size target's extent, clips the viewport to it and scales the blit's coordinates by it.
+      callback(() => { esm().SetRenderTarget(0, GetCanvasTarget(backend)); esm().SetDepthStencilBuffer(null); esm().SetFullScreenViewport();
+        upsampleFx.SetParameter__TextureAL("BlitSource", halfPaper.GetRenderTarget()); }),
+      upsample
+    ]) halfJob.steps.push(step);
+    const full = { territory: ndc(-0.5, 0.9), overlap: ndc(-0.45, 0.5), opaqueOverlap: ndc(0.55, 0.5) };
+    const cost = [];
+    for (let i = 0; i < 3; i++) cost.push((await TimeJob(job)).gpuMs, (await TimeJob(halfJob)).gpuMs);
+    PumpLoading();
+    DrawNow(halfJob);
+    probe.drawImage(canvas, 0, 0);
+    pixels = probe.getImageData(0, 0, W, H).data;
+    const half = { territory: ndc(-0.5, 0.9), overlap: ndc(-0.45, 0.5), opaqueOverlap: ndc(0.55, 0.5) };
+    results.halfResolution = { ok: Object.keys(full).every(k => near(full[k], half[k], 3)), fullResolution: full, halfThenUpsampled: half,
+      gpuMs: { full: cost.filter((_, i) => i % 2 === 0).map(v => +v.toFixed(3)), half: cost.filter((_, i) => i % 2 === 1).map(v => +v.toFixed(3)) },
+      note: "flat regions match the full-resolution picture after a filtered upsample; edges soften, as they should" };
+    if (params.get("half") === "1") spike.loopJob = halfJob;
+    else { ReleaseRenderTarget(halfColour); ReleaseRenderTarget(halfPaper); ReleaseRenderTarget(halfDepth); }
   }
 
   // ---- timing: per-job GPU time.

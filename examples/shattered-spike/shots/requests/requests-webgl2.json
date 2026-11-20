@@ -5,31 +5,31 @@
  },
  {
   "path": "dist/requests.js",
-  "bytes": 17115
+  "bytes": 19573
  },
  {
   "path": "dist/chunks/chunk-VAFCPQLD.js",
   "bytes": 38195
  },
  {
-  "path": "dist/chunks/chunk-XE3FN6U4.js",
-  "bytes": 57069
- },
- {
-  "path": "dist/chunks/chunk-YMDC7PZM.js",
-  "bytes": 413669
+  "path": "dist/chunks/chunk-7KCHWHTY.js",
+  "bytes": 1270622
  },
  {
   "path": "dist/chunks/chunk-K66WX5MZ.js",
   "bytes": 127774
  },
  {
-  "path": "dist/chunks/chunk-2Z34X3AK.js",
-  "bytes": 1270555
+  "path": "dist/chunks/chunk-XE3FN6U4.js",
+  "bytes": 57069
  },
  {
   "path": "dist/chunks/chunk-SHZCZBVO.js",
   "bytes": 1363632
+ },
+ {
+  "path": "dist/chunks/chunk-YMDC7PZM.js",
+  "bytes": 413669
  },
  {
   "path": "dist/chunks/chunk-KB7WVJHK.js",
@@ -48,44 +48,44 @@
   "bytes": 99982
  },
  {
-  "path": "res/graphics/effect.webgl/shattered/system/blit.sm_depth",
-  "bytes": 4443
+  "path": "res/graphics/effect.webgl/shattered/req/territory.sm_depth",
+  "bytes": 3953
  },
  {
   "path": "res/graphics/effect.webgl/shattered/system/blitfiltered.sm_depth",
   "bytes": 4113
  },
  {
-  "path": "res/graphics/effect.webgl/shattered/req/washopaque.sm_depth",
-  "bytes": 3958
+  "path": "res/graphics/effect.webgl/shattered/system/blit.sm_depth",
+  "bytes": 4443
+ },
+ {
+  "path": "res/graphics/effect.webgl/shattered/req/paper.sm_depth",
+  "bytes": 4553
  },
  {
   "path": "res/graphics/effect.webgl/shattered/req/wash.sm_depth",
   "bytes": 3984
  },
  {
-  "path": "res/graphics/effect.webgl/shattered/req/paper.sm_depth",
-  "bytes": 4589
- },
- {
-  "path": "res/graphics/effect.webgl/shattered/req/territory.sm_depth",
-  "bytes": 3953
- },
- {
-  "path": "res/graphics/effect.webgl/shattered/req/glow.sm_depth",
-  "bytes": 3944
+  "path": "res/graphics/effect.webgl/shattered/req/washopaque.sm_depth",
+  "bytes": 3958
  },
  {
   "path": "res/graphics/effect.webgl/shattered/req/show.sm_depth",
   "bytes": 4509
  },
  {
-  "path": "res/graphics/effect.webgl/shattered/req/inst.sm_depth",
-  "bytes": 3582
- },
- {
   "path": "res/graphics/effect.webgl/shattered/req/spanline.sm_depth",
   "bytes": 5897
+ },
+ {
+  "path": "res/graphics/effect.webgl/shattered/req/glow.sm_depth",
+  "bytes": 3944
+ },
+ {
+  "path": "res/graphics/effect.webgl/shattered/req/inst.sm_depth",
+  "bytes": 3582
  },
  {
   "path": "res/textures/backdrop.jpg",

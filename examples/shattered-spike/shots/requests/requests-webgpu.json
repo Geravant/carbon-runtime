@@ -5,7 +5,7 @@
  },
  {
   "path": "dist/requests.js",
-  "bytes": 17115
+  "bytes": 19573
  },
  {
   "path": "dist/chunks/chunk-VAFCPQLD.js",
@@ -16,12 +16,12 @@
   "bytes": 127774
  },
  {
-  "path": "dist/chunks/chunk-2Z34X3AK.js",
-  "bytes": 1270555
- },
- {
   "path": "dist/chunks/chunk-XE3FN6U4.js",
   "bytes": 57069
+ },
+ {
+  "path": "dist/chunks/chunk-7KCHWHTY.js",
+  "bytes": 1270622
  },
  {
   "path": "dist/chunks/chunk-YMDC7PZM.js",
@@ -48,40 +48,40 @@
   "bytes": 2842
  },
  {
-  "path": "res/graphics/effect.webgpu/shattered/system/blitfiltered.sm_depth",
-  "bytes": 2592
- },
- {
   "path": "res/graphics/effect.webgpu/shattered/req/territory.sm_depth",
   "bytes": 2195
- },
- {
-  "path": "res/graphics/effect.webgpu/shattered/req/wash.sm_depth",
-  "bytes": 2231
  },
  {
   "path": "res/graphics/effect.webgpu/shattered/req/washopaque.sm_depth",
   "bytes": 2199
  },
  {
-  "path": "res/graphics/effect.webgpu/shattered/req/paper.sm_depth",
-  "bytes": 3019
+  "path": "res/graphics/effect.webgpu/shattered/system/blitfiltered.sm_depth",
+  "bytes": 2592
  },
  {
-  "path": "res/graphics/effect.webgpu/shattered/req/glow.sm_depth",
-  "bytes": 2191
+  "path": "res/graphics/effect.webgpu/shattered/req/wash.sm_depth",
+  "bytes": 2231
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/req/paper.sm_depth",
+  "bytes": 2963
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/req/spanline.sm_depth",
+  "bytes": 3874
  },
  {
   "path": "res/graphics/effect.webgpu/shattered/req/show.sm_depth",
   "bytes": 2910
  },
  {
-  "path": "res/graphics/effect.webgpu/shattered/req/inst.sm_depth",
-  "bytes": 1941
+  "path": "res/graphics/effect.webgpu/shattered/req/glow.sm_depth",
+  "bytes": 2191
  },
  {
-  "path": "res/graphics/effect.webgpu/shattered/req/spanline.sm_depth",
-  "bytes": 3874
+  "path": "res/graphics/effect.webgpu/shattered/req/inst.sm_depth",
+  "bytes": 1941
  },
  {
   "path": "res/textures/backdrop.jpg",

@@ -283,7 +283,7 @@
      30
     ]
    },
-   "rect32Ms": 0.7
+   "rect32Ms": 0.5
   },
   "floats": {
    "ok": true,
@@ -405,9 +405,9 @@
     "blockBytes": 33554432
    },
    "registered": {
-    "start": 19,
-    "afterRelease": 19,
-    "afterDrop": 19
+    "start": 20,
+    "afterRelease": 20,
+    "afterDrop": 20
    },
    "note": "900 = 300 geometries x 3 slices (vertices, indices, reversed indices). Dropping references frees nothing; ReleaseGeometry gives the slices back and the next 300 reuse them (no new block)"
   },
@@ -440,32 +440,100 @@
     }
    }
   },
+  "targets": {
+   "ok": true,
+   "before": [
+    true,
+    true,
+    true
+   ],
+   "after": {
+    "releaseResourcesNoArgument": true,
+    "releaseRenderTarget": false,
+    "depthReleased": false
+   },
+   "createdAgain": [
+    true,
+    32
+   ],
+   "note": "ReleaseResources() with no storage mask is a no-op; ReleaseRenderTarget (Destroy + leave the registry) frees for good and stays freed over device ticks; Create makes it again"
+  },
+  "halfResolution": {
+   "ok": true,
+   "fullResolution": {
+    "territory": [
+     147,
+     168,
+     210
+    ],
+    "overlap": [
+     199,
+     147,
+     77
+    ],
+    "opaqueOverlap": [
+     236,
+     219,
+     121
+    ]
+   },
+   "halfThenUpsampled": {
+    "territory": [
+     147,
+     168,
+     210
+    ],
+    "overlap": [
+     199,
+     147,
+     77
+    ],
+    "opaqueOverlap": [
+     236,
+     219,
+     121
+    ]
+   },
+   "gpuMs": {
+    "full": [
+     0.069,
+     0.049,
+     0.089
+    ],
+    "half": [
+     0.042,
+     0.104,
+     0.085
+    ]
+   },
+   "note": "flat regions match the full-resolution picture after a filtered upsample; edges soften, as they should"
+  },
   "timing": {
    "ok": true,
    "method": "timer-query",
    "gpuMs": [
-    0.071,
-    0.095,
-    1.618,
-    0.095,
-    0.11,
-    0.093
+    0.024,
+    0.079,
+    0.25,
+    0.05,
+    0.073,
+    0.086
    ],
    "cpuMs": [
-    0.5,
-    1,
-    0.6,
-    0.7,
-    0.7,
-    0.7
+    0.2,
+    0.4,
+    0.4,
+    0.3,
+    0.4,
+    0.3
    ],
    "blocking": {
     "method": "readback",
     "gpuMs": [
-     1.6,
-     1.2,
-     1.5,
-     0.9
+     1.1,
+     0.7,
+     0.8,
+     0.6
     ]
    },
    "size": [

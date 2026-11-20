@@ -24,11 +24,13 @@ PaperVSOutput PaperVS( PaperVSInput input )
 
 float4 PaperPS( PaperVSOutput input ) : SV_Target
 {
+    // The target's own pixel, from SV_Position: TriStepRenderEffect's texture coordinates are scaled to the DEVICE
+    // (canvas) viewport (Tr2RenderUtils.adjustTextureCoordsToViewport), so in a smaller target they run past 1.
     uint width;
     uint height;
     SceneColour.GetDimensions( width, height );
     int2 size = int2( width, height );
-    float4 scene = SceneColour.Load( int3( clamp( int2( input.texCoord * float2( size ) ), int2( 0, 0 ), size - 1 ), 0 ) );
+    float4 scene = SceneColour.Load( int3( clamp( int2( input.position.xy ), int2( 0, 0 ), size - 1 ), 0 ) );
     float3 paper = float3( 0.95, 0.92, 0.85 );
     return float4( lerp( paper, scene.rgb, saturate( scene.a ) ), 1.0 );
 }

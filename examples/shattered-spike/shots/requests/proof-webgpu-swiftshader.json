@@ -283,7 +283,7 @@
      30
     ]
    },
-   "rect32Ms": 0.2
+   "rect32Ms": 0.3
   },
   "floats": {
    "ok": true,
@@ -405,9 +405,9 @@
     "blockBytes": 33554432
    },
    "registered": {
-    "start": 19,
-    "afterRelease": 19,
-    "afterDrop": 19
+    "start": 20,
+    "afterRelease": 20,
+    "afterDrop": 20
    },
    "note": "900 = 300 geometries x 3 slices (vertices, indices, reversed indices). Dropping references frees nothing; ReleaseGeometry gives the slices back and the next 300 reuse them (no new block)"
   },
@@ -440,37 +440,105 @@
     }
    }
   },
+  "targets": {
+   "ok": true,
+   "before": [
+    true,
+    true,
+    true
+   ],
+   "after": {
+    "releaseResourcesNoArgument": true,
+    "releaseRenderTarget": false,
+    "depthReleased": false
+   },
+   "createdAgain": [
+    true,
+    32
+   ],
+   "note": "ReleaseResources() with no storage mask is a no-op; ReleaseRenderTarget (Destroy + leave the registry) frees for good and stays freed over device ticks; Create makes it again"
+  },
+  "halfResolution": {
+   "ok": true,
+   "fullResolution": {
+    "territory": [
+     147,
+     168,
+     210
+    ],
+    "overlap": [
+     199,
+     147,
+     77
+    ],
+    "opaqueOverlap": [
+     236,
+     219,
+     121
+    ]
+   },
+   "halfThenUpsampled": {
+    "territory": [
+     147,
+     168,
+     210
+    ],
+    "overlap": [
+     199,
+     147,
+     77
+    ],
+    "opaqueOverlap": [
+     236,
+     219,
+     121
+    ]
+   },
+   "gpuMs": {
+    "full": [
+     12.755,
+     3.449,
+     4.161
+    ],
+    "half": [
+     92.833,
+     10.317,
+     2.854
+    ]
+   },
+   "note": "flat regions match the full-resolution picture after a filtered upsample; edges soften, as they should"
+  },
   "timing": {
    "ok": true,
    "method": "timestamp",
    "gpuMs": [
-    9.414,
-    39.528,
-    15.607,
-    18.661,
-    21.802,
-    15.008
+    5.929,
+    5.955,
+    24.668,
+    24.477,
+    18.301,
+    20.782
    ],
    "cpuMs": [
-    0.7,
-    0.7,
-    0.7,
+    0.4,
     0.5,
-    0.5,
-    0.5
+    0.4,
+    0.3,
+    0.4,
+    0.4
    ],
    "submitsPerJob": 1,
    "ticks": [
-    1363428383415416,
-    1363428392829458
+    1365429283582958,
+    1365429289512416
    ],
    "blocking": {
     "method": "timestamp",
     "gpuMs": [
-     21.098,
-     7.456,
-     7.814,
-     7.127
+     3.862,
+     10.512,
+     3.265,
+     2.838
     ]
    },
    "size": [

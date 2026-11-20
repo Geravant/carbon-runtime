@@ -54,3 +54,18 @@ export function RegisteredResourceCount()
 {
   return TriDevice.GetResourcesRegistered().length;
 }
+
+/**
+ * Frees a `Tr2RenderTarget` or `Tr2DepthStencil` for good: its device texture now, and its creation parameters, so
+ * nothing rebuilds it. (`ReleaseResources(storage)` is the engine's residency call: with no argument it does nothing,
+ * and with a storage mask it frees the texture but keeps the parameters, and the next use rebuilds it.)
+ * `Create` on the same object makes it again.
+ *
+ * @param {object} target A `Tr2RenderTarget` or `Tr2DepthStencil`.
+ */
+export function ReleaseRenderTarget(target)
+{
+  if (!target) return;
+  target.Destroy();
+  TriDevice.UnregisterResource(target);
+}
