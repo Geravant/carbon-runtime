@@ -26,6 +26,14 @@ npm install ./vendor/geravant-carbon-runtime-slim-<version>.tgz
 
 `package.json` then holds `"@geravant/carbon-runtime-slim": "file:vendor/geravant-carbon-runtime-slim-<version>.tgz"`, and the lock file holds its integrity hash. To move to a newer engine, pack again, replace the file and reinstall; delete the old tarball.
 
+**In a Docker image the tarball has to be there before the install.** A `file:` dependency is read by `npm ci` / `npm install`, so a Dockerfile that copies `package.json` and the lock file first and the rest later fails with a missing-file error. Copy `vendor/` in the same step:
+
+```dockerfile
+COPY package.json package-lock.json ./
+COPY vendor/ ./vendor/
+RUN npm ci
+```
+
 The package is one ES module with lazy chunks and no dependencies. Vite 6 bundles it as it is (checked: a `vite build` of the spike page over the tarball runs on both backends; the main chunk is 3,162 KB raw, 710 KB gzip). The package's files are not minified; the game's production build minifies them. Vite prints one warning, that `new URL("./CjsResManWorker.js", import.meta.url)` does not exist at build time: that is the engine's optional resource-loading worker, which `ShatteredBoot` does not start.
 
 ```js
@@ -145,7 +153,7 @@ struct HullTargets { float4 colour : SV_Target0; float4 normal : SV_Target1; };
 HullTargets HullMrtPS( HullVSOutput input ) { HullTargets output; /* ... */ return output; }
 ```
 
-The spike page does this under `?mrt=1` (`effects/hullmrt.fx`): the picture is identical, pixel for pixel, to the two-pass one on WebGPU and on WebGL2, and the two backends' pictures are identical to each other (`shots/m3/mrt/`, compared with `tools/diff.mjs`). 30 ships: 31 draws a frame instead of 61. Both targets must be the same size; they may differ in format. The blend state of the pass applies to every target.
+The spike page does this under `?mrt=1` (`effects/hullmrt.fx`): the picture is identical, pixel for pixel, to the two-pass one on WebGPU and on WebGL2, and the two backends' pictures are identical to each other (`shots/m3/mrt/`, compared with `tools/diff.mjs`). 30 ships: 31 draws a frame instead of 61. Not tested: targets of different sizes or formats (the spike's are both RGBA16F at the canvas's size), and more than two targets.
 
 ### Effects
 
@@ -187,6 +195,6 @@ Three things are swapped at build time instead of editing engine files (`shatter
 
 - the Trinity barrel that `CjsLibrary` imports (every Trinity and EVE class) is replaced by `shattered/src/trinityForLibrary.js`, which names the five classes `CjsLibrary` uses;
 - the engine's default resource registrations (`src/core/configuration.js`) are replaced by `shattered/src/configuration.js`, which registers compiled effect containers only;
-- the dynamic imports of SOF, character and audio in `CjsLibrary`, and of the two DXBC effect translators in `CjsBrowserBackend`, resolve to an empty module.
+- the dynamic imports of SOF, character and audio in `CjsLibrary`, and of the two DXBC effect translators and the Black reader, resolve to one shared empty module. It is a single chunk, `dist/chunks/absent-<hash>.js`; no file in the package is named after a module that was left out, and the build fails if one is.
 
 A host that needs a file format (textures, for example) passes it in `ShatteredBoot`'s `configuration` option, in the engine's own configuration vocabulary. The build fails if two exported barrels export the same name with different meanings (`export *` would silently export neither); name the wanted one in `shattered/src/index.js`.

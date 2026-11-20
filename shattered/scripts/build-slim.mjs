@@ -54,7 +54,9 @@ const enginePlugin = {
     {
       if (args.kind !== "dynamic-import") return null;
       const target = path.resolve(args.resolveDir, args.path);
-      return EMPTY.test(target) ? { path: target, namespace: "shattered-empty" } : null;
+      // One shared stand-in, so the package holds one empty chunk named `absent-<hash>.js` and no file
+      // named after an EVE-side module (sof, EveSOF, CjsCharacterFactory, CjsBlackFormat, the DXBC formats).
+      return EMPTY.test(target) ? { path: "absent", namespace: "shattered-empty" } : null;
     });
     b.onLoad({ filter: /.*/, namespace: "shattered-empty" }, () => ({ contents: "export {};", loader: "js" }));
     b.onLoad({ filter: /\.js$/ }, async args =>
@@ -169,6 +171,16 @@ fs.chmodSync(path.join(outdir, "tools", "build-effects.mjs"), 0o755);
   }
   fs.writeFileSync(path.join(outdir, "exports.json"), `${JSON.stringify([ ...exported ].sort(), null, 0)}\n`);
   console.log(`exports: ${exported.size} names`);
+}
+// No file in the package may carry the name of a module the slim build leaves out.
+{
+  const LEFT_OUT = /sof|character|blackformat|webgpuformat|webglformat|audio/iu;
+  const named = fs.readdirSync(path.join(outdir, "chunks")).filter(file => LEFT_OUT.test(file));
+  if (named.length)
+  {
+    console.error(`chunks named after modules the slim build leaves out: ${named.join(", ")}`);
+    process.exitCode = 1;
+  }
 }
 if (args.includes("--analyze")) fs.writeFileSync(path.join(outdir, "meta.json"), JSON.stringify(written.metafile));
 const kb = bytes => `${Math.round(bytes / 1000).toLocaleString("en-US")} KB`;
