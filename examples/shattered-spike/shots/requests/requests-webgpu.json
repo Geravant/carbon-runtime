@@ -1,0 +1,94 @@
+[
+ {
+  "path": "requests.html",
+  "bytes": 647
+ },
+ {
+  "path": "dist/requests.js",
+  "bytes": 17115
+ },
+ {
+  "path": "dist/chunks/chunk-VAFCPQLD.js",
+  "bytes": 38195
+ },
+ {
+  "path": "dist/chunks/chunk-K66WX5MZ.js",
+  "bytes": 127774
+ },
+ {
+  "path": "dist/chunks/chunk-2Z34X3AK.js",
+  "bytes": 1270555
+ },
+ {
+  "path": "dist/chunks/chunk-XE3FN6U4.js",
+  "bytes": 57069
+ },
+ {
+  "path": "dist/chunks/chunk-YMDC7PZM.js",
+  "bytes": 413669
+ },
+ {
+  "path": "dist/chunks/chunk-SHZCZBVO.js",
+  "bytes": 1363632
+ },
+ {
+  "path": "dist/chunks/chunk-KB7WVJHK.js",
+  "bytes": 5271
+ },
+ {
+  "path": "dist/chunks/CjsBrowserBackend-CJATX275-LN4JYXAI.js",
+  "bytes": 108979
+ },
+ {
+  "path": "dist/chunks/chunk-ZUWZGR3I.js",
+  "bytes": 1159
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/system/blit.sm_depth",
+  "bytes": 2842
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/system/blitfiltered.sm_depth",
+  "bytes": 2592
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/req/territory.sm_depth",
+  "bytes": 2195
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/req/wash.sm_depth",
+  "bytes": 2231
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/req/washopaque.sm_depth",
+  "bytes": 2199
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/req/paper.sm_depth",
+  "bytes": 3019
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/req/glow.sm_depth",
+  "bytes": 2191
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/req/show.sm_depth",
+  "bytes": 2910
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/req/inst.sm_depth",
+  "bytes": 1941
+ },
+ {
+  "path": "res/graphics/effect.webgpu/shattered/req/spanline.sm_depth",
+  "bytes": 3874
+ },
+ {
+  "path": "res/textures/backdrop.jpg",
+  "bytes": 366272
+ },
+ {
+  "path": "res/textures/backdrop.jpg",
+  "bytes": 366272
+ }
+]

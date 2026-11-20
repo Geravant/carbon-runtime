@@ -1,0 +1,514 @@
+{
+ "backend": "webgpu",
+ "gpu": "metal",
+ "allOk": true,
+ "warmupFrames": 1,
+ "requests": {
+  "loadcap": {
+   "ok": true,
+   "full": [
+    1920,
+    1080
+   ],
+   "capped": [
+    256,
+    144
+   ],
+   "cappedMips": 9,
+   "blankCanvas": {
+    "ok": true,
+    "width": 32,
+    "height": 16,
+    "contextCreated": false
+   }
+  },
+  "washes": {
+   "ok": true,
+   "expected": {
+    "territory": [
+     147,
+     168,
+     210
+    ],
+    "wash1": [
+     175,
+     104,
+     121
+    ],
+    "overlap": [
+     199,
+     147,
+     77
+    ],
+    "wash2": [
+     166,
+     173,
+     140
+    ],
+    "opaqueWash1": [
+     235,
+     124,
+     102
+    ],
+    "opaqueOverlap": [
+     236,
+     219,
+     121
+    ]
+   },
+   "measured": {
+    "territory": [
+     147,
+     168,
+     210
+    ],
+    "wash1": [
+     175,
+     104,
+     121
+    ],
+    "overlap": [
+     199,
+     147,
+     77
+    ],
+    "wash2": [
+     166,
+     173,
+     140
+    ],
+    "opaqueWash1": [
+     235,
+     125,
+     102
+    ],
+    "opaqueOverlap": [
+     236,
+     219,
+     121
+    ],
+    "paper": [
+     242,
+     235,
+     217
+    ]
+   },
+   "strengthInTarget": {
+    "territory": 0.5,
+    "wash1OverTerritory": 0.8,
+    "bothOverTerritory": 0.9,
+    "opaqueWash1": 0.6,
+    "opaqueOverlap": 0.5
+   },
+   "note": "blended (left): each wash adds strength (0.5, 0.8, 0.9) and mixes its pigment over what is there; opaque (right, today): the later stroke replaces everything, so the overlap has less strength (0.5) than the wash it lies on (0.6) and the territory under it is gone - the pale hole"
+  },
+  "leak": {
+   "ok": true,
+   "territoryPixel": [
+    [
+     147,
+     168,
+     210
+    ],
+    [
+     147,
+     168,
+     210
+    ]
+   ],
+   "paperPixel": [
+    [
+     242,
+     235,
+     217
+    ],
+    [
+     242,
+     235,
+     217
+    ]
+   ],
+   "note": "a TriStepRenderObject with renderAdditive runs right before the full-screen paper pass (AlphaBlendEnable = false); the canvas must hold the same picture 5 frames later"
+  },
+  "capacity": {
+   "ok": true,
+   "allocationsMade": 2,
+   "log": [
+    {
+     "rows": 5,
+     "capacity": 16,
+     "drawnCount": 5,
+     "lastDrawn": true,
+     "nextEmpty": true
+    },
+    {
+     "rows": 12,
+     "capacity": 16,
+     "drawnCount": 12,
+     "lastDrawn": true,
+     "nextEmpty": true
+    },
+    {
+     "rows": 16,
+     "capacity": 16,
+     "drawnCount": 16,
+     "lastDrawn": true,
+     "nextEmpty": true
+    },
+    {
+     "rows": 3,
+     "capacity": 16,
+     "drawnCount": 3,
+     "lastDrawn": true,
+     "nextEmpty": true
+    },
+    {
+     "rows": 9,
+     "capacity": 16,
+     "drawnCount": 9,
+     "lastDrawn": true,
+     "nextEmpty": true
+    },
+    {
+     "rows": 17,
+     "capacity": 32,
+     "drawnCount": 17,
+     "lastDrawn": true,
+     "nextEmpty": true
+    },
+    {
+     "rows": 30,
+     "capacity": 32,
+     "drawnCount": 30,
+     "lastDrawn": true,
+     "nextEmpty": null
+    },
+    {
+     "rows": 2,
+     "capacity": 32,
+     "drawnCount": 2,
+     "lastDrawn": true,
+     "nextEmpty": true
+    },
+    {
+     "rows": 31,
+     "capacity": 32,
+     "drawnCount": 31,
+     "lastDrawn": null,
+     "nextEmpty": null
+    },
+    {
+     "rows": 6,
+     "capacity": 32,
+     "drawnCount": 6,
+     "lastDrawn": true,
+     "nextEmpty": true
+    }
+   ],
+   "note": "minCapacity 16: rows 5..16 share one 16-row allocation, 17..31 one 32-row allocation; Tr2RuntimeInstanceData would have reallocated at every change of count"
+  },
+  "subrect": {
+   "ok": true,
+   "measured": {
+    "redCorner": [
+     220,
+     30,
+     30
+    ],
+    "green": [
+     30,
+     200,
+     40
+    ],
+    "greenEdge": [
+     30,
+     200,
+     40
+    ],
+    "redOutsideEdge": [
+     220,
+     30,
+     30
+    ],
+    "blue": [
+     30,
+     40,
+     210
+    ],
+    "white": [
+     255,
+     255,
+     255
+    ],
+    "redBelowWhite": [
+     220,
+     30,
+     30
+    ]
+   },
+   "expected": {
+    "redCorner": [
+     220,
+     30,
+     30
+    ],
+    "green": [
+     30,
+     200,
+     40
+    ],
+    "greenEdge": [
+     30,
+     200,
+     40
+    ],
+    "redOutsideEdge": [
+     220,
+     30,
+     30
+    ],
+    "blue": [
+     30,
+     40,
+     210
+    ],
+    "white": [
+     255,
+     255,
+     255
+    ],
+    "redBelowWhite": [
+     220,
+     30,
+     30
+    ]
+   },
+   "rect32Ms": 0.3
+  },
+  "floats": {
+   "ok": true,
+   "measured": {
+    "f32texel0": [
+     64,
+     128,
+     191
+    ],
+    "f32texel1": [
+     191,
+     128,
+     64
+    ],
+    "f16texel0": [
+     64,
+     128,
+     191
+    ],
+    "f16texel1": [
+     16,
+     32,
+     239
+    ]
+   },
+   "expected": {
+    "f32texel0": [
+     64,
+     128,
+     191
+    ],
+    "f32texel1": [
+     191,
+     128,
+     64
+    ],
+    "f16texel0": [
+     64,
+     128,
+     191
+    ],
+    "f16texel1": [
+     16,
+     32,
+     239
+    ]
+   },
+   "note": "values above 1000 survive (an 8-bit texture would hold 1.0); texel 1 of the rgba32f texture was written by a 1x1 UpdateTextureFromData"
+  },
+  "spans": {
+   "ok": true,
+   "before": {
+    "line0": [
+     0,
+     1,
+     1,
+     0
+    ],
+    "line1": [
+     1,
+     1,
+     0,
+     0
+    ],
+    "line2": [
+     0
+    ]
+   },
+   "after": {
+    "line0": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "line1": [
+     0,
+     0,
+     1,
+     1
+    ],
+    "line2": [
+     1
+    ]
+   },
+   "vertexBufferRefills": 0,
+   "note": "1 = line drawn at s = 0.1, 0.35, 0.65, 0.9 along it (line2: its middle). Before: line0 span 0.25..0.75, line1 0..0.5, line2 hidden (1..0). After: 0..1, 0.5..1, 0..1, with no SubmitChanges"
+  },
+  "release": {
+   "ok": true,
+   "start": {
+    "allocations": 33,
+    "bytes": 5280,
+    "blocks": 1,
+    "blockBytes": 33554432
+   },
+   "drawn300": {
+    "allocations": 933,
+    "bytes": 101280,
+    "blocks": 1,
+    "blockBytes": 33554432
+   },
+   "afterRelease": {
+    "allocations": 33,
+    "bytes": 5280,
+    "blocks": 1,
+    "blockBytes": 33554432
+   },
+   "drawnAgain300": {
+    "allocations": 933,
+    "bytes": 101280,
+    "blocks": 1,
+    "blockBytes": 33554432
+   },
+   "dropped300WithoutRelease": {
+    "allocations": 933,
+    "bytes": 101280,
+    "blocks": 1,
+    "blockBytes": 33554432
+   },
+   "registered": {
+    "start": 19,
+    "afterRelease": 19,
+    "afterDrop": 19
+   },
+   "note": "900 = 300 geometries x 3 slices (vertices, indices, reversed indices). Dropping references frees nothing; ReleaseGeometry gives the slices back and the next 300 reuse them (no new block)"
+  },
+  "idleSweep": {
+   "ok": true,
+   "state": {
+    "geometry": {
+     "good": true,
+     "meshData": true,
+     "neverPurge": false,
+     "drawsAgain": true
+    },
+    "imageTexture": {
+     "texture": true,
+     "neverPurge": true
+    },
+    "dataTexture": {
+     "texture": true,
+     "neverPurge": true
+    },
+    "unguardedImageTexture": {
+     "texture": true,
+     "good": true
+    },
+    "renderTarget": {
+     "validBefore": true,
+     "validAfter": false,
+     "neverPurge": false,
+     "validAfterOneTick": true
+    }
+   }
+  },
+  "timing": {
+   "ok": true,
+   "method": "timestamp",
+   "gpuMs": [
+    0.455,
+    0.088,
+    0.055,
+    0.054,
+    0.072,
+    0.053
+   ],
+   "cpuMs": [
+    0.5,
+    0.8,
+    0.4,
+    0.5,
+    0.5,
+    0.4
+   ],
+   "submitsPerJob": 1,
+   "ticks": [
+    717483001618875,
+    717483002073826
+   ],
+   "blocking": {
+    "method": "timestamp",
+    "gpuMs": [
+     0.111,
+     0.053,
+     0.073,
+     0.048
+    ]
+   },
+   "size": [
+    480,
+    270
+   ]
+  },
+  "camera": {
+   "ok": true,
+   "verticalFovFromProjection": {
+    "0.5": {
+     "eveAt1_6": 0.5,
+     "eveAt16_9": 0.451772,
+     "orbitAt16_9": 0.5,
+     "orbitAt1_6": 0.5,
+     "orbitAt4_3": 0.5
+    },
+    "0.75": {
+     "eveAt1_6": 0.75,
+     "eveAt16_9": 0.680937,
+     "orbitAt16_9": 0.75,
+     "orbitAt1_6": 0.75,
+     "orbitAt4_3": 0.75
+    },
+    "1.2": {
+     "eveAt1_6": 1.2,
+     "eveAt16_9": 1.103801,
+     "orbitAt16_9": 1.2,
+     "orbitAt1_6": 1.2,
+     "orbitAt4_3": 1.2
+    }
+   },
+   "orbitSecondsAt2_2": 0.6,
+   "withDefaultZoomCurve": {
+    "asked": 0.5,
+    "fieldOfViewAfter": 1.140806
+   },
+   "note": "EveCamera honours fieldOfView (zoomCurve null) up to aspect 1.6; wider, it narrows the vertical by 1.6/aspect (Carbon's clamp). OrbitCamera holds it at every aspect."
+  }
+ }
+}
