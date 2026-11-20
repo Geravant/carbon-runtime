@@ -1,0 +1,57 @@
+{
+ "ready": true,
+ "error": null,
+ "frames": 7,
+ "firstFrameMs": 58.200000047683716,
+ "backend": "webgpu",
+ "adapter": "webgpu",
+ "diagnostics": [],
+ "jobStatus": 2,
+ "scene": {
+  "markers": 400,
+  "lineSegments": 53,
+  "particlesAlive": 218,
+  "camera": "chase",
+  "jobStatus": 2,
+  "cpuMsMean": 1.84,
+  "cpuMsMax": 7.1
+ },
+ "wallMs": 276,
+ "webgpuAdapter": true,
+ "canvasRead": {
+  "width": 1280,
+  "height": 720,
+  "distinctColours": 6106,
+  "litShare": 0.1233,
+  "corner": [
+   122,
+   81,
+   49,
+   255
+  ],
+  "planetCentre": [
+   164,
+   103,
+   77,
+   255
+  ],
+  "picks": {
+   "planetCentre": {
+    "what": "marker",
+    "index": 118,
+    "distance": 2.767
+   },
+   "corner": {
+    "what": "planet",
+    "distance": 6.931
+   },
+   "marker0": {
+    "what": "marker",
+    "index": 118,
+    "distance": 2.728
+   }
+  }
+ }
+}
+shots/webgpu-chase-030.png
+requests: 17, unanswered: 0

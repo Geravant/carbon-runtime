@@ -1,0 +1,61 @@
+{
+ "ready": true,
+ "error": null,
+ "frames": 7,
+ "firstFrameMs": 76.20000004768372,
+ "backend": "webgl2",
+ "adapter": "webgl2",
+ "diagnostics": [],
+ "jobStatus": 2,
+ "scene": {
+  "markers": 400,
+  "lineSegments": 53,
+  "particlesAlive": 218,
+  "camera": "chase",
+  "jobStatus": 2,
+  "cpuMsMean": 3.34,
+  "cpuMsMax": 6.9
+ },
+ "wallMs": 292,
+ "webgpuAdapter": false,
+ "canvasRead": {
+  "width": 1280,
+  "height": 720,
+  "distinctColours": 6087,
+  "litShare": 0.1233,
+  "corner": [
+   122,
+   81,
+   49,
+   255
+  ],
+  "planetCentre": [
+   164,
+   103,
+   77,
+   255
+  ],
+  "picks": {
+   "planetCentre": {
+    "what": "marker",
+    "index": 118,
+    "distance": 2.766
+   },
+   "corner": {
+    "what": "planet",
+    "distance": 6.931
+   },
+   "marker0": {
+    "what": "marker",
+    "index": 118,
+    "distance": 2.727
+   }
+  }
+ }
+}
+shots/webgl2-chase-030.png
+[info] WebGPU is experimental on this platform. See https://github.com/gpuweb/gpuweb/wiki/Implementation-Status#implementation-status
+[warning] Failed to create WebGPU Context Provider
+[info] WebGPU is experimental on this platform. See https://github.com/gpuweb/gpuweb/wiki/Implementation-Status#implementation-status
+[warning] Failed to create WebGPU Context Provider
+requests: 18, unanswered: 0

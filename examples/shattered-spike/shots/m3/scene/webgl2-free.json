@@ -1,0 +1,59 @@
+{
+ "ready": true,
+ "error": null,
+ "frames": 7,
+ "firstFrameMs": 67.89999997615814,
+ "backend": "webgl2",
+ "adapter": "webgl2",
+ "diagnostics": [],
+ "jobStatus": 2,
+ "scene": {
+  "markers": 400,
+  "lineSegments": 53,
+  "particlesAlive": 218,
+  "camera": "free",
+  "jobStatus": 2,
+  "cpuMsMean": 2.66,
+  "cpuMsMax": 7
+ },
+ "wallMs": 287,
+ "webgpuAdapter": false,
+ "canvasRead": {
+  "width": 1280,
+  "height": 720,
+  "distinctColours": 5228,
+  "litShare": 0.1173,
+  "corner": [
+   11,
+   13,
+   24,
+   255
+  ],
+  "planetCentre": [
+   202,
+   149,
+   105,
+   255
+  ],
+  "picks": {
+   "planetCentre": {
+    "what": "planet",
+    "distance": 9.273
+   },
+   "corner": {
+    "what": "nothing"
+   },
+   "marker0": {
+    "what": "marker",
+    "index": 0,
+    "distance": 12.287
+   }
+  }
+ }
+}
+shots/webgl2-free-030.png
+[info] WebGPU is experimental on this platform. See https://github.com/gpuweb/gpuweb/wiki/Implementation-Status#implementation-status
+[warning] Failed to create WebGPU Context Provider
+[info] WebGPU is experimental on this platform. See https://github.com/gpuweb/gpuweb/wiki/Implementation-Status#implementation-status
+[warning] Failed to create WebGPU Context Provider
+requests: 18, unanswered: 0

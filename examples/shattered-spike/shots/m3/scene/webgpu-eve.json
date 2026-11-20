@@ -1,0 +1,55 @@
+{
+ "ready": true,
+ "error": null,
+ "frames": 7,
+ "firstFrameMs": 58.299999952316284,
+ "backend": "webgpu",
+ "adapter": "webgpu",
+ "diagnostics": [],
+ "jobStatus": 2,
+ "scene": {
+  "markers": 400,
+  "lineSegments": 53,
+  "particlesAlive": 218,
+  "camera": "eve",
+  "jobStatus": 2,
+  "cpuMsMean": 1.86,
+  "cpuMsMax": 7.3
+ },
+ "wallMs": 275,
+ "webgpuAdapter": true,
+ "canvasRead": {
+  "width": 1280,
+  "height": 720,
+  "distinctColours": 5919,
+  "litShare": 0.1104,
+  "corner": [
+   11,
+   13,
+   24,
+   255
+  ],
+  "planetCentre": [
+   144,
+   119,
+   79,
+   255
+  ],
+  "picks": {
+   "planetCentre": {
+    "what": "planet",
+    "distance": 10.9
+   },
+   "corner": {
+    "what": "nothing"
+   },
+   "marker0": {
+    "what": "marker",
+    "index": 0,
+    "distance": 11.353
+   }
+  }
+ }
+}
+shots/webgpu-eve-030.png
+requests: 17, unanswered: 0

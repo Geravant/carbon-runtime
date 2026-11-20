@@ -1,7 +1,7 @@
 // Runs the spike page in headless system Chrome with WebGPU and captures it.
 //
 //   node examples/shattered-spike/tools/shoot.mjs [--probe] [--bench] [--angles 0,45,...] [--ships N]
-//        [--backend webgpu|webgl2] [--gpu metal|swiftshader|stand] [--out m1] [--executable <chromium>] [--strict]
+//        [--page scene.html] [--backend webgpu|webgl2] [--gpu metal|swiftshader|stand] [--out m1] [--executable <chromium>] [--strict]
 //
 // Serves examples/shattered-spike/ from a free local port for the run and stops the server at
 // the end. Audio is muted. Screenshots go to ../shots/ (or ../shots/<--out>/).
@@ -86,9 +86,9 @@ async function open(query)
   const started = Date.now();
   // On WebGL2 runs the page keeps its default preference (WebGPU, then WebGL2): the browser has no
   // WebGPU adapter, so reaching WebGL2 is the engine's own fallback. --force-backend asks for it by name.
-  await page.goto(`${base}index.html?${flag("--force-backend") ? `backend=${BACKEND}&` : ""}${query}`);
+  await page.goto(`${base}${option("--page", "index.html")}?${flag("--force-backend") ? `backend=${BACKEND}&` : ""}${query}`);
   await page.waitForFunction(() => window.__spike && (window.__spike.error || (window.__spike.ready && window.__spike.frames > 5)), null, { timeout: Number(option("--wait", 20000)) }).catch(() => {});
-  const state = await page.evaluate(() => ({ ready: window.__spike?.ready, error: window.__spike?.error, frames: window.__spike?.frames, firstFrameMs: window.__spike?.firstFrameMs, backend: window.__spike?.backendName, adapter: window.__spike?.adapter, diagnostics: (window.__spike?.diagnostics ?? []).slice(0, 6), jobStatus: window.__spike?.status?.(), textures: window.__spike?.textures, canvasUploads: window.__spike?.canvasUploads }));
+  const state = await page.evaluate(() => ({ ready: window.__spike?.ready, error: window.__spike?.error, frames: window.__spike?.frames, firstFrameMs: window.__spike?.firstFrameMs, backend: window.__spike?.backendName, adapter: window.__spike?.adapter, diagnostics: (window.__spike?.diagnostics ?? []).slice(0, 6), jobStatus: window.__spike?.status?.(), scene: window.__spike?.scene, textures: window.__spike?.textures, canvasUploads: window.__spike?.canvasUploads }));
   state.wallMs = Date.now() - started;
   state.webgpuAdapter = await page.evaluate(async () => !!(navigator.gpu && await navigator.gpu.requestAdapter().catch(() => null)));
   if (state.backend !== BACKEND) failed = true;
@@ -198,7 +198,13 @@ try
     const angles = flag("--probe") ? [ 30 ] : option("--angles", "0,45,90,135,180,225,270,315").split(",").map(Number);
     const { page, state } = await open(`ships=${ships}&yaw=${angles[0]}&${extra}`);
     console.log(JSON.stringify(state, null, 1));
-    if (flag("--debug")) console.log(JSON.stringify(await page.evaluate(() => window.__spike.debug?.())));
+    if (flag("--debug"))
+    {
+      // Called twice, three frames apart: a page's debug() may install a hook on the first call and report on the second.
+      await page.evaluate(() => window.__spike.debug?.());
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)))));
+      console.log(JSON.stringify(await page.evaluate(() => ({ ...window.__spike.debug?.(), trace: window.__spike.trace }))));
+    }
     if (state.ready && !state.error)
     {
       for (const angle of angles)

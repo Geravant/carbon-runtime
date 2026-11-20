@@ -1,0 +1,55 @@
+{
+ "ready": true,
+ "error": null,
+ "frames": 7,
+ "firstFrameMs": 57.60000002384186,
+ "backend": "webgpu",
+ "adapter": "webgpu",
+ "diagnostics": [],
+ "jobStatus": 2,
+ "scene": {
+  "markers": 400,
+  "lineSegments": 53,
+  "particlesAlive": 218,
+  "camera": "free",
+  "jobStatus": 2,
+  "cpuMsMean": 1.9,
+  "cpuMsMax": 7.1
+ },
+ "wallMs": 273,
+ "webgpuAdapter": true,
+ "canvasRead": {
+  "width": 1280,
+  "height": 720,
+  "distinctColours": 5233,
+  "litShare": 0.1173,
+  "corner": [
+   11,
+   13,
+   24,
+   255
+  ],
+  "planetCentre": [
+   202,
+   149,
+   105,
+   255
+  ],
+  "picks": {
+   "planetCentre": {
+    "what": "planet",
+    "distance": 9.273
+   },
+   "corner": {
+    "what": "nothing"
+   },
+   "marker0": {
+    "what": "marker",
+    "index": 0,
+    "distance": 12.288
+   }
+  }
+ }
+}
+shots/webgpu-free-030.png
+requests: 17, unanswered: 0

@@ -29,7 +29,7 @@ const outdir = join(root, "dist");
 rmSync(outdir, { recursive: true, force: true });
 const result = await build({
   absWorkingDir: root,
-  entryPoints: { spike: join(root, "src", "main.js") },
+  entryPoints: { spike: join(root, "src", "main.js"), scene: join(root, "src", "scene.js") },
   outdir,
   bundle: true,
   splitting: true,

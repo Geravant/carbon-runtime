@@ -96,7 +96,6 @@ A viewport set this way on the canvas is honoured to the pixel on WebGPU and Web
 | `SetBuiltInEffectPaths({ blit, blitFiltered })` or the `effectPaths` option | serving our files at the engine's `managed/space/system/` paths |
 | `AcquireBackend({ ..., translator: false })` (done by `ShatteredBoot`) | passing an `effects` section by hand |
 | `Tr2DepthStencil.Create` now throws a `RangeError` for a format no backend can create | an invalid surface with no message |
-
 | `backend.GetCanvasTarget()` | `backend.name === "webgpu" ? backend.renderTarget : backend.al.GetDefaultBackBuffer()` |
 | `DrawNow(job)`, `PumpLoading()` | calling `PumpOS()` per view with guards in every job callback |
 | `LoadTexture`, `CreateTextureFromImage`, `UpdateTextureFromImage` | nothing: textures were not loadable before |
@@ -154,6 +153,17 @@ HullTargets HullMrtPS( HullVSOutput input ) { HullTargets output; /* ... */ retu
 ```
 
 The spike page does this under `?mrt=1` (`effects/hullmrt.fx`): the picture is identical, pixel for pixel, to the two-pass one on WebGPU and on WebGL2, and the two backends' pictures are identical to each other (`shots/m3/mrt/`, compared with `tools/diff.mjs`). 30 ships: 31 draws a frame instead of 61. Not tested: targets of different sizes or formats (the spike's are both RGBA16F at the canvas's size), and more than two targets.
+
+### Scene building blocks: instancing, lines, particles, picking, cameras
+
+All tried on both backends on the capability page `examples/shattered-spike/scene.html` (`src/scene.js`, effects in `effects/scene/`); the ratings and the reasons are in `07-scene-capabilities.md` in the port docs. What a consumer must know:
+
+- **Untextured effects draw now.** The engine's effect-sorted accumulators (opaque, decal, additive) used to set aside every indexed triangle batch whose effect binds no texture as a "GPU-driven" batch, and nothing in this runtime draws those: the batch vanished with no error. `ShatteredBoot` turns that split off (`EffectKeyGenerator.ALLOW_GDPR = false`), so every batch is drawn, effect-sorted as before. A host that boots some other way must set it itself.
+- **Instancing:** `Tr2InstancedMesh` over `Tr2RuntimeInstanceData` (`SetElementLayout`, `SetData(rows)`, `UpdateData()` each time the rows change). Instance elements reach the vertex shader with their usage index raised by 8: the stream's `TEXCOORD0` is `TEXCOORD8` in the effect.
+- **Lines:** `Tr2CurveLineSet` with our own effect (`SetLineEffect`); `AddStraightLine`, `AddCurvedLineCrt` (a Hermite curve), `AddSpheredLineCrt`, then `SubmitChanges()`. The vertex layout our effect must read is in `effects/scene/line.fx`. Its batches go to the additive list when `SetAdditiveFlag(true)`, else transparent.
+- **Particles (CPU):** `Tr2ParticleSystem`, `Tr2DynamicEmitter`, the attribute generators, forces and constraints are exported. Draw the system as the instance stream of a `Tr2InstancedMesh` over a quad. Each frame, after `emitter.UpdateSimulation(dt)` and `system.UpdateSimulation(dt)`, call `system.UpdateViewDependentData(null, worldMatrix)` and `system.SortParticles()`: that is what a scene driver did, and without it the system simulates but uploads nothing. Elements arrive as `POSITION8`/`POSITION9` (now, previous), `TANGENT8` (lifetime: x age 0..1, y seconds), `NORMAL8` (velocity). The GPU particle systems are not exported.
+- **Picking:** `screenToProjection` and `convertProjectionCoordToWorldPickRay` give a world ray from a pixel; `ray3` (`from`, `getIntersectPositionRadius`, `getIntersectBox3`, `getIntersectTri3`) intersects it. Which objects can be picked is the host's.
+- **Cameras:** `EveCamera` (an orbit camera with its own `TriView` and `TriProjection`) is exported; set `zoomCurve = null` or its default curve overrides `fieldOfView`, and pass `Update` Blue time (`CcpTime.timeFromDouble(seconds)`), not seconds. Chase and free cameras are a few lines on `TriView.SetLookAtPosition` and `TriProjection.PerspectiveFov` (the page has both).
 
 ### Effects
 

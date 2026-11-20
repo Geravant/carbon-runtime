@@ -8,6 +8,7 @@ import { Tr2Blitter } from "../../src/trinity/core/Tr2Blitter.js";
 import { Tr2Renderer } from "../../src/trinity/core/Tr2Renderer.js";
 import { Tr2RenderContext_GetMainThreadRenderContext } from "../../src/trinity/core/context/Tr2RenderContext.js";
 import { Tr2RenderJobs } from "../../src/trinity/renderJob/Tr2RenderJobs.js";
+import { EffectKeyGenerator } from "../../src/trinity/core/batch/TriRenderBatch/EffectKeyGenerator.js";
 import { SetTextureHost } from "./ShatteredTextures.js";
 
 const SHADER_MODELS = Object.freeze({
@@ -142,6 +143,12 @@ export async function ShatteredBoot({ canvas, res, preference = [ "webgpu", "web
 {
   if (!Object.hasOwn(SHADER_MODELS, shaderModel)) throw new RangeError(`shaderModel must be one of ${Object.keys(SHADER_MODELS).join(", ")}`);
   if (effectPaths) SetBuiltInEffectPaths(effectPaths);
+  // Effect-sorted accumulators (opaque, decal, additive) set aside every indexed triangle batch whose material
+  // binds no texture as a "GPU-driven" batch (TriRenderBatchAccumulator.Commit), and nothing in this runtime
+  // draws that list: TriStepRenderObject and Tr2RenderContext.RenderBatches walk only the plain one. An
+  // untextured effect on an instanced quad (particles, markers) or a mesh was silently never drawn. With the
+  // flag off every batch goes to the plain list, effect-sorted as before.
+  EffectKeyGenerator.ALLOW_GDPR = false;
 
   const library = new CjsLibrary({ callbackMan: { useWorkers: false }, ...configuration });
   // translator: false - GetEffectConfiguration then names the backend's own effect tree.

@@ -1,0 +1,74 @@
+[
+ {
+  "path": "scene.html",
+  "bytes": 665
+ },
+ {
+  "path": "dist/scene.js",
+  "bytes": 14315
+ },
+ {
+  "path": "dist/chunks/chunk-3KL534RQ.js",
+  "bytes": 19252
+ },
+ {
+  "path": "dist/chunks/chunk-K66WX5MZ.js",
+  "bytes": 127774
+ },
+ {
+  "path": "dist/chunks/chunk-TWXX5W4P.js",
+  "bytes": 1258636
+ },
+ {
+  "path": "dist/chunks/chunk-XE3FN6U4.js",
+  "bytes": 57069
+ },
+ {
+  "path": "dist/chunks/chunk-YMDC7PZM.js",
+  "bytes": 413669
+ },
+ {
+  "path": "dist/chunks/chunk-SHZCZBVO.js",
+  "bytes": 1363632
+ },
+ {
+  "path": "dist/chunks/chunk-KB7WVJHK.js",
+  "bytes": 5271
+ },
+ {
+  "path": "dist/chunks/CjsBrowserBackend-2JPDWIQJ-TF7TQGHE.js",
+  "bytes": 128073
+ },
+ {
+  "path": "dist/chunks/chunk-ZUWZGR3I.js",
+  "bytes": 1159
+ },
+ {
+  "path": "dist/chunks/Tr2RenderContextALWebgl2-O5PR3K25-5TGOTMQJ.js",
+  "bytes": 99982
+ },
+ {
+  "path": "res/graphics/effect.webgl/shattered/system/blit.sm_depth",
+  "bytes": 4443
+ },
+ {
+  "path": "res/graphics/effect.webgl/shattered/system/blitfiltered.sm_depth",
+  "bytes": 4113
+ },
+ {
+  "path": "res/graphics/effect.webgl/shattered/scene/planet.sm_depth",
+  "bytes": 5491
+ },
+ {
+  "path": "res/graphics/effect.webgl/shattered/scene/marker.sm_depth",
+  "bytes": 5105
+ },
+ {
+  "path": "res/graphics/effect.webgl/shattered/scene/line.sm_depth",
+  "bytes": 6166
+ },
+ {
+  "path": "res/graphics/effect.webgl/shattered/scene/particle.sm_depth",
+  "bytes": 5653
+ }
+]

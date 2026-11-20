@@ -21,6 +21,20 @@ export * from "../../src/trinity/renderJob/index.js";
 export * from "../../src/trinity/shader/index.js";
 export * from "../../src/trinity/resources/index.js";
 export * from "../../src/input/index.js";
+// CPU particles: the system, its element declarations, emitters, generators, forces and constraints.
+// The GPU particle systems (compute, and effects at fixed EVE paths) are not exported.
+export { Tr2ParticleSystem } from "../../src/trinity/particle/Tr2ParticleSystem.js";
+export { Tr2DynamicEmitter } from "../../src/trinity/particle/emitter/Tr2DynamicEmitter.js";
+export { Tr2StaticEmitter } from "../../src/trinity/particle/emitter/Tr2StaticEmitter.js";
+export * from "../../src/trinity/particle/ITr2GenericEmitter/index.js";
+export * from "../../src/trinity/particle/element/index.js";
+export * from "../../src/trinity/particle/attribute/index.js";
+export * from "../../src/trinity/particle/force/index.js";
+export * from "../../src/trinity/particle/constraint/index.js";
+// The engine's orbit camera. It lives under trinity/eve in the source tree but depends on nothing there:
+// maths, curves, TriView and TriProjection only.
+export { EveCamera } from "../../src/trinity/eve/camera/EveCamera.js";
+export { screenToProjection } from "../../src/trinity/core/view/pickRay.js";
 export { CjsConstantLayout } from "../../src/trinity/core/rawData/CjsConstantLayout.js";
 export { CjsLibrary } from "../../src/core/CjsLibrary.js";
 export * from "./ShatteredRuntime.js";

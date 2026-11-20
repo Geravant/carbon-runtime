@@ -1,0 +1,59 @@
+{
+ "ready": true,
+ "error": null,
+ "frames": 7,
+ "firstFrameMs": 64.20000004768372,
+ "backend": "webgl2",
+ "adapter": "webgl2",
+ "diagnostics": [],
+ "jobStatus": 2,
+ "scene": {
+  "markers": 400,
+  "lineSegments": 53,
+  "particlesAlive": 218,
+  "camera": "eve",
+  "jobStatus": 2,
+  "cpuMsMean": 2.74,
+  "cpuMsMax": 7.2
+ },
+ "wallMs": 282,
+ "webgpuAdapter": false,
+ "canvasRead": {
+  "width": 1280,
+  "height": 720,
+  "distinctColours": 5924,
+  "litShare": 0.1104,
+  "corner": [
+   11,
+   13,
+   24,
+   255
+  ],
+  "planetCentre": [
+   144,
+   119,
+   79,
+   255
+  ],
+  "picks": {
+   "planetCentre": {
+    "what": "planet",
+    "distance": 10.9
+   },
+   "corner": {
+    "what": "nothing"
+   },
+   "marker0": {
+    "what": "marker",
+    "index": 0,
+    "distance": 11.353
+   }
+  }
+ }
+}
+shots/webgl2-eve-030.png
+[info] WebGPU is experimental on this platform. See https://github.com/gpuweb/gpuweb/wiki/Implementation-Status#implementation-status
+[warning] Failed to create WebGPU Context Provider
+[info] WebGPU is experimental on this platform. See https://github.com/gpuweb/gpuweb/wiki/Implementation-Status#implementation-status
+[warning] Failed to create WebGPU Context Provider
+requests: 18, unanswered: 0
